@@ -31,10 +31,6 @@ const Gamification = {
       AppData.setLevel(newRank.level);
       leveledUp = true;
     }
-    // Kontribusi ke XP global lintas-app (opsional, tidak mengubah XP lokal di atas)
-    if (typeof SharedGamification !== "undefined") {
-      SharedGamification.awardXP("villain-arc", amount, reason);
-    }
     return { amount, reason, newTotal, leveledUp, rank: newRank };
   },
 
@@ -129,7 +125,9 @@ const Gamification = {
     const legDayCount = completedLogs.filter((l) => l.dayType === "LEGS").length;
     if (legDayCount >= 15) tryUnlock("leg-day-loyalist");
 
-    if (context.newPR && context.singleSessionReps >= 100) tryUnlock("century-club");
+    // "Push-up 100 reps (kumulatif dalam 1 sesi failure)" — dicek dari total
+    // semua SET dalam satu sesi hari itu, bukan harus jadi PR baru dulu.
+    if (context.pushupSessionTotal >= 100) tryUnlock("century-club");
     if (context.painConverterSelfReport) tryUnlock("pain-converter");
     if (context.kaiReady) tryUnlock("kai-ready");
 
