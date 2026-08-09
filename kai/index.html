@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAI Psikotes Simulator v2 — Mesin Prosedural</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="../shared/storage-bridge.js" onerror="console.warn('shared module tidak tersedia (mode standalone)')"></script>
+<script src="../shared/gamification-core.js" onerror="console.warn('shared module tidak tersedia (mode standalone)')"></script>
+<style>
+/* ==========================================================================
+   DESIGN TOKENS — "Papan Perjalanan" (departure-board) theme, dark/light.
+   ========================================================================== */
+:root {
+  --font-display: 'Oswald', sans-serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --accent: #F2A93B;
+  --accent-2: #4FB3D9;
+  --success: #3FAE7A;
+  --danger: #D64550;
+  --radius: 10px;
+  --transition: 180ms ease;
+}
+html[data-theme="dark"] {
+  --bg: #0B1420; --bg-elevated: #121F30; --bg-card: #16263A; --bg-inset: #0E1A28;
+  --border: #24374F; --text: #E8EEF5; --text-dim: #93A4BC; --track-line: #1C2E44;
+}
+html[data-theme="light"] {
+  --bg: #EEF1F5; --bg-elevated: #FFFFFF; --bg-card: #FFFFFF; --bg-inset: #E4E9F0;
+  --border: #D2DAE4; --text: #10202F; --text-dim: #4C5C70; --track-line: #D8DEE8;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); transition: background var(--transition), color var(--transition); min-height: 100vh; }
+button { font-family: var(--font-body); cursor: pointer; }
+input { font-family: var(--font-mono); }
+canvas { display: block; }
+
+.board-header { background: var(--bg-elevated); border-bottom: 3px solid var(--accent); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; position: sticky; top: 0; z-index: 50; }
+.board-title { font-family: var(--font-display); letter-spacing: 2px; font-size: 22px; text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+.board-title .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.board-clock { font-family: var(--font-mono); background: var(--bg-inset); border: 1px solid var(--border); border-radius: 6px; padding: 6px 14px; font-size: 15px; letter-spacing: 2px; color: var(--accent); }
+.theme-switch { display: flex; align-items: center; gap: 8px; background: var(--bg-inset); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; font-size: 13px; color: var(--text-dim); }
+.theme-switch button { background: var(--accent); border: none; color: #14202E; font-weight: 600; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+
+main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+.view { display: none; animation: fadeIn 220ms ease; }
+.view.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+
+.dash-intro { margin-bottom: 24px; }
+.dash-intro h1 { font-family: var(--font-display); font-size: 30px; letter-spacing: 1px; margin: 0 0 6px; }
+.dash-intro p { color: var(--text-dim); max-width: 680px; line-height: 1.5; margin: 0; }
+
+.track-list { display: flex; flex-direction: column; border-top: 1px solid var(--track-line); }
+.track-row { display: grid; grid-template-columns: 60px 1fr auto; gap: 18px; align-items: center; padding: 18px 8px; border-bottom: 1px solid var(--track-line); transition: background var(--transition); }
+.track-row:hover { background: var(--bg-card); }
+.track-no { font-family: var(--font-mono); font-size: 26px; color: var(--accent); text-align: center; border-right: 2px dashed var(--border); }
+.track-info h3 { margin: 0 0 4px; font-family: var(--font-display); letter-spacing: 0.5px; font-size: 19px; }
+.track-info p { margin: 0 0 6px; color: var(--text-dim); font-size: 14px; line-height: 1.4; }
+.badge { display: inline-block; font-family: var(--font-mono); font-size: 12px; padding: 3px 9px; border-radius: 5px; background: var(--bg-inset); border: 1px solid var(--border); color: var(--text-dim); }
+.badge.done { color: var(--success); border-color: var(--success); }
+.btn { background: var(--accent); color: #14202E; border: none; padding: 10px 18px; border-radius: var(--radius); font-weight: 600; font-size: 14px; white-space: nowrap; transition: transform var(--transition), opacity var(--transition); }
+.btn:hover { transform: translateY(-1px); opacity: 0.92; }
+.btn.secondary { background: var(--bg-inset); color: var(--text); border: 1px solid var(--border); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.module-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--track-line); }
+.module-head h2 { font-family: var(--font-display); letter-spacing: 1px; margin: 0 0 4px; font-size: 24px; }
+.module-head p { margin: 0; color: var(--text-dim); font-size: 14px; }
+.back-link { background: none; border: none; color: var(--text-dim); font-size: 13px; margin-bottom: 14px; padding: 0; }
+.back-link:hover { color: var(--accent); }
+
+.stat-strip { display: flex; gap: 10px; flex-wrap: wrap; }
+.stat-chip { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; text-align: center; min-width: 84px; }
+.stat-chip .v { font-family: var(--font-mono); font-size: 18px; color: var(--accent); display:block; }
+.stat-chip .l { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ---------------- KRAEPELIN (true infinite DOM growth) ---------------- */
+.kr-wrap { display: flex; gap: 28px; flex-wrap: wrap; }
+.kr-scroll-frame { width: 140px; height: 340px; overflow-y: auto; background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius); scroll-behavior: smooth; }
+.kr-digit { height: 42px; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 20px; color: var(--text-dim); border-bottom: 1px dashed var(--track-line); }
+.kr-digit.active { color: var(--text); background: rgba(242,169,59,0.15); font-weight: 700; font-size: 22px; }
+.kr-panel { flex: 1; min-width: 260px; }
+.kr-input-row { display: flex; gap: 10px; align-items: center; margin: 16px 0; }
+.kr-input-row input { width: 70px; font-size: 26px; text-align: center; padding: 10px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--bg-card); color: var(--text); }
+.kr-input-row input:focus { outline: none; border-color: var(--accent); }
+.kr-keypad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 320px; }
+.kr-keypad button { padding: 12px 0; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-family: var(--font-mono); font-size: 16px; }
+.kr-keypad button:hover { border-color: var(--accent); color: var(--accent); }
+.kr-feedback { min-height: 22px; font-size: 13px; margin-top: 8px; }
+.kr-feedback.ok { color: var(--success); }
+.kr-feedback.bad { color: var(--danger); }
+.kr-timer { font-family: var(--font-mono); font-size: 30px; color: var(--accent); }
+
+/* ---------------- QUESTION CARD (shared) ---------------- */
+.q-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; }
+.q-progress { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); margin-bottom: 10px; }
+.q-text { font-size: 17px; line-height: 1.6; margin: 0 0 18px; white-space: pre-line; }
+.q-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.opt-btn { text-align: left; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-inset); color: var(--text); font-size: 15px; transition: border-color var(--transition), background var(--transition); }
+.opt-btn:hover:not(:disabled) { border-color: var(--accent); }
+.opt-btn.correct { border-color: var(--success); background: rgba(63,174,122,0.15); }
+.opt-btn.wrong { border-color: var(--danger); background: rgba(214,69,80,0.15); }
+.opt-btn:disabled { cursor: default; }
+.q-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; }
+
+/* ---------------- SPATIAL (canvas) ---------------- */
+.shape-canvas-wrap { display: flex; justify-content: center; }
+.shape-canvas-wrap canvas { border-radius: 6px; }
+.opt-label { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); display:block; margin-bottom: 6px; }
+.opt-btn.spatial-opt { text-align: center; }
+
+/* ---------------- MEMORY ---------------- */
+.mem-progress-bar { height: 8px; background: var(--bg-inset); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); margin: 14px 0 20px; }
+.mem-progress-fill { height: 100%; background: var(--accent); width: 100%; transition: width 1s linear; }
+.mem-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.mem-entity { background: var(--bg-inset); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.6; }
+.mem-entity b { color: var(--accent); }
+
+/* ---------------- PERSONALITY (ipsative A/B) ---------------- */
+.ip-options { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.ip-card { text-align: left; padding: 18px 20px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--bg-inset); color: var(--text); font-size: 15.5px; line-height: 1.5; display: flex; gap: 14px; align-items: flex-start; }
+.ip-card .ip-letter { font-family: var(--font-mono); font-weight: 700; color: var(--accent); font-size: 18px; }
+.ip-card:hover:not(:disabled) { border-color: var(--accent); }
+.ip-card.chosen { border-color: var(--accent-2); background: rgba(79,179,217,0.14); }
+.radar-wrap { max-width: 480px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.dominant-trait { text-align: center; margin-top: 14px; font-family: var(--font-display); letter-spacing: 0.5px; color: var(--accent); font-size: 18px; }
+
+/* ---------------- RESULTS ---------------- */
+.result-hero { text-align: center; padding: 30px 10px; }
+.result-score { font-family: var(--font-mono); font-size: 54px; color: var(--accent); }
+.result-sub { color: var(--text-dim); margin-top: 4px; }
+.result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 24px 0; }
+.result-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+
+footer { text-align: center; color: var(--text-dim); font-size: 12px; padding: 20px; }
+</style>
+</head>
+<body>
+
+<header class="board-header">
+  <a href="../" class="board-title" style="text-decoration:none;color:inherit;"><span class="dot"></span> KAI PSIKOTES SIMULATOR</a>
+  <div class="board-clock" id="liveClock">00:00:00</div>
+  <div class="theme-switch"><span>Mode</span><button id="themeToggleBtn">Ubah</button></div>
+</header>
+
+<main>
+
+  <!-- ============================= DASHBOARD ============================= -->
+  <section class="view active" id="view-dashboard">
+    <div class="dash-intro">
+      <h1>Papan Latihan Psikotes — Mesin Prosedural</h1>
+      <p>Setiap soal di setiap modul dibangkitkan ulang secara algoritmik pada saat itu juga — tidak ada bank soal statis. Pilih jalur latihan di bawah, seperti memilih peron di stasiun.</p>
+    </div>
+    <div class="track-list" id="trackList"></div>
+  </section>
+
+  <!-- ============================= KRAEPELIN ============================= -->
+  <section class="view" id="view-kraepelin">
+    <button class="back-link" data-back>&larr; Kembali ke Papan Utama</button>
+    <div class="module-head">
+      <div>
+        <h2>Modul Kraepelin / Pauli</h2>
+        <p>Jumlahkan dua angka yang berdekatan secara vertikal (mod 10). Kolom angka tumbuh tanpa henti selama waktu berjalan.</p>
+      </div>
+      <div class="kr-timer" id="krTimer">05:00</div>
+    </div>
+    <div class="stat-strip" style="margin-bottom:18px;">
+      <div class="stat-chip"><span class="v" id="krCorrect">0</span><span class="l">Benar</span></div>
+      <div class="stat-chip"><span class="v" id="krWrong">0</span><span class="l">Salah</span></div>
+      <div class="stat-chip"><span class="v" id="krAcc">0%</span><span class="l">Akurasi</span></div>
+      <div class="stat-chip"><span class="v" id="krSpeed">0</span><span class="l">APM</span></div>
+    </div>
+    <div class="kr-wrap">
+      <div class="kr-scroll-frame" id="krFrame"><div id="krColumn"></div></div>
+      <div class="kr-panel">
+        <p class="q-progress">Masukkan angka satuan dari hasil penjumlahan pasangan yang disorot.</p>
+        <div class="kr-input-row">
+          <input type="text" id="krInput" maxlength="1" inputmode="numeric" autocomplete="off">
+          <button class="btn" id="krSubmit">Jawab</button>
+        </div>
+        <div class="kr-keypad" id="krKeypad"></div>
+        <div class="kr-feedback" id="krFeedback"></div>
+        <div style="margin-top:20px;"><button class="btn secondary" id="krStart">Mulai Hitung Mundur</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= TPA ============================= -->
+  <section class="view" id="view-tpa">
+    <button class="back-link" data-back>&larr; Kembali ke Papan Utama</button>
+    <div class="module-head">
+      <div>
+        <h2>Modul TPA — Kombinatorik &amp; Cerita Prosedural</h2>
+        <p>Deret berlapis (Fibonacci × bilangan prima, geometri bersarang, dll.) dan soal cerita dengan subjek/objek acak.</p>
+      </div>
+    </div>
+    <div id="tpaArea"></div>
+  </section>
+
+  <!-- ============================= SPATIAL ============================= -->
+  <section class="view" id="view-spatial">
+    <button class="back-link" data-back>&larr; Kembali ke Papan Utama</button>
+    <div class="module-head">
+      <div>
+        <h2>Modul Logika Spasial</h2>
+        <p>Transformasi aljabar linear (rotasi/refleksi) digambar langsung di kanvas — kenali hasil transformasi yang benar.</p>
+      </div>
+    </div>
+    <div id="spatialArea"></div>
+  </section>
+
+  <!-- ============================= MEMORY ============================= -->
+  <section class="view" id="view-memory">
+    <button class="back-link" data-back>&larr; Kembali ke Papan Utama</button>
+    <div class="module-head">
+      <div>
+        <h2>Modul Daya Ingat</h2>
+        <p>Hafalkan 10 data kereta (kode kereta, kursi, penumpang) yang dibangkitkan acak, lalu jawab dari memori.</p>
+      </div>
+    </div>
+    <div id="memoryArea"></div>
+  </section>
+
+  <!-- ============================= PERSONALITY ============================= -->
+  <section class="view" id="view-personality">
+    <button class="back-link" data-back>&larr; Kembali ke Papan Utama</button>
+    <div class="module-head">
+      <div>
+        <h2>Inventori Kepribadian (Ipsatif)</h2>
+        <p>Pilih pernyataan yang paling menggambarkan diri Anda pada setiap pasangan. Hasil akhir divisualisasikan dalam radar chart.</p>
+      </div>
+    </div>
+    <div id="personalityArea"></div>
+  </section>
+
+</main>
+
+<footer>Simulasi latihan mandiri — bukan produk resmi PT Kereta Api Indonesia.</footer>
+
+<script>
+/* ==========================================================================
+   ============================  APP UTILITIES  ============================
+   ========================================================================== */
+const Util = {
+  randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; },
+  choice(arr) { return arr[Util.randInt(0, arr.length - 1)]; },
+  shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Util.randInt(0, i); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  },
+  pad(n) { return n.toString().padStart(2, '0'); },
+  formatSeconds(total) { const m = Math.floor(total / 60); const s = total % 60; return `${Util.pad(m)}:${Util.pad(s)}`; },
+  numericDistractors(correct, count, spread) {
+    const set = new Set([correct]);
+    let guard = 0;
+    while (set.size < count + 1 && guard < 300) {
+      guard++;
+      const delta = Util.randInt(-spread, spread) || 1;
+      set.add(correct + delta);
+    }
+    return [...set].filter(v => v !== correct).slice(0, count);
+  },
+  isPrime(n) {
+    if (n < 2) return false;
+    for (let i = 2; i * i <= n; i++) if (n % i === 0) return false;
+    return true;
+  },
+  primesUpTo(count) {
+    const primes = [];
+    let n = 2;
+    while (primes.length < count) { if (Util.isPrime(n)) primes.push(n); n++; }
+    return primes;
+  }
+};
+
+/* ==========================================================================
+   ROUTER
+   ========================================================================== */
+const Router = { go(id) { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); document.getElementById(id).classList.add('active'); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
+document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => Router.go('view-dashboard')));
+
+/* THEME */
+document.getElementById('themeToggleBtn').addEventListener('click', () => {
+  const html = document.documentElement;
+  html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+function tickClock() {
+  const now = new Date();
+  document.getElementById('liveClock').textContent = `${Util.pad(now.getHours())}:${Util.pad(now.getMinutes())}:${Util.pad(now.getSeconds())}`;
+}
+setInterval(tickClock, 1000); tickClock();
+
+/* ==========================================================================
+   DASHBOARD
+   ========================================================================== */
+const ModuleRegistry = [
+  { id: 'kraepelin', no: '01', name: 'Kraepelin / Pauli', desc: 'Kolom angka DOM tanpa batas, 5 menit hitung mundur.', view: 'view-kraepelin', start: () => Kraepelin.start() },
+  { id: 'tpa', no: '02', name: 'TPA — Kombinatorik', desc: 'Deret berlapis & soal cerita prosedural.', view: 'view-tpa', start: () => TPA.start() },
+  { id: 'spatial', no: '03', name: 'Logika Spasial', desc: 'Rotasi & refleksi matriks di kanvas HTML5.', view: 'view-spatial', start: () => Spatial.start() },
+  { id: 'memory', no: '04', name: 'Daya Ingat', desc: 'Entitas data KAI yang dibangkitkan dinamis.', view: 'view-memory', start: () => Memory.start() },
+  { id: 'personality', no: '05', name: 'Inventori Kepribadian', desc: 'Pasangan pernyataan ipsatif + radar chart.', view: 'view-personality', start: () => Personality.start() },
+];
+// Persistence: lastScores dulu hilang saat refresh (in-memory only).
+// Sekarang disimpan ke localStorage, plus riwayat lengkap per modul
+// (bukan cuma skor terakhir) supaya progress tidak hilang.
+const KAI_LS_KEY = 'kai:lastScores';
+const KAI_LS_HISTORY_KEY = 'kai:history';
+function loadLastScores() {
+  try { return JSON.parse(localStorage.getItem(KAI_LS_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveLastScores() {
+  try { localStorage.setItem(KAI_LS_KEY, JSON.stringify(lastScores)); } catch (e) {}
+}
+function appendLocalHistory(entry) {
+  try {
+    const hist = JSON.parse(localStorage.getItem(KAI_LS_HISTORY_KEY)) || [];
+    hist.push(entry);
+    if (hist.length > 200) hist.splice(0, hist.length - 200); // cegah membengkak tanpa batas
+    localStorage.setItem(KAI_LS_HISTORY_KEY, JSON.stringify(hist));
+  } catch (e) {}
+}
+
+const lastScores = loadLastScores();
+function renderDashboard() {
+  const list = document.getElementById('trackList');
+  list.innerHTML = '';
+  ModuleRegistry.forEach(mod => {
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    const badge = lastScores[mod.id] ? `<span class="badge done">Terakhir: ${lastScores[mod.id]}</span>` : `<span class="badge">Belum dicoba</span>`;
+    row.innerHTML = `
+      <div class="track-no">${mod.no}</div>
+      <div class="track-info"><h3>${mod.name}</h3><p>${mod.desc}</p>${badge}</div>
+      <div><button class="btn">Mulai Latihan</button></div>
+    `;
+    row.querySelector('.btn').addEventListener('click', () => { Router.go(mod.view); mod.start(); });
+    list.appendChild(row);
+  });
+}
+renderDashboard();
+
+/**
+ * reportScore — dipanggil tiap modul selesai.
+ * detail (opsional): { correct, total, pct, extra } — dipakai untuk
+ * riwayat + bridge cross-app + XP global. Modul ipsatif (Kepribadian)
+ * tidak punya correct/total (no right/wrong) jadi detail boleh kosong.
+ */
+function reportScore(id, label, detail) {
+  lastScores[id] = label;
+  saveLastScores();
+  renderDashboard();
+
+  const entry = { module: id, label, ...(detail || {}) };
+  appendLocalHistory({ ...entry, date: new Date().toISOString() });
+
+  // Bridge cross-app: tulis ke IndexedDB bersama (bukan Villain Arc kai_test_history,
+  // lihat catatan di shared/storage-bridge.js) + kontribusi XP global.
+  if (typeof SharedStorage !== 'undefined') {
+    SharedStorage.saveKaiPsikotesResult(entry);
+  }
+  if (typeof SharedGamification !== 'undefined' && detail && typeof detail.pct === 'number') {
+    const passed = detail.pct >= 80;
+    SharedGamification.awardXP('kai', passed ? SharedGamification.XP_UNITS.kai_pass : Math.round(detail.pct / 4), id);
+  }
+}
+
+function renderResultScreen(container, { correct, total, extraStats = [], onRetry, onHome, customBody }) {
+  const pct = total ? Math.round((correct / total) * 100) : 0;
+  container.innerHTML = `
+    <div class="q-card result-hero">
+      ${customBody ? '' : `<div class="result-score">${correct}/${total}</div><div class="result-sub">${pct}% jawaban benar</div>`}
+      <div class="result-grid">${extraStats.map(s => `<div class="stat-chip"><span class="v">${s.value}</span><span class="l">${s.label}</span></div>`).join('')}</div>
+      <div id="resultCustomSlot"></div>
+      <div class="result-actions">
+        <button class="btn" id="resRetry">Coba Lagi (Soal Baru)</button>
+        <button class="btn secondary" id="resHome">Kembali ke Papan Utama</button>
+      </div>
+    </div>`;
+  container.querySelector('#resRetry').addEventListener('click', onRetry);
+  container.querySelector('#resHome').addEventListener('click', onHome || (() => Router.go('view-dashboard')));
+  return container.querySelector('#resultCustomSlot');
+}
+
+/* ==========================================================================
+   ==========================  1. KRAEPELIN ENGINE  =========================
+   ========================================================================== */
+const Kraepelin = (() => {
+  const DURATION_SECONDS = 5 * 60;
+  let nodes = [];
+  let pointer = 0;
+  let correct = 0, wrong = 0, attempted = 0;
+  let secondsLeft = DURATION_SECONDS;
+  let timerHandle = null;
+  let running = false;
+
+  function appendDigits(n) {
+    const col = document.getElementById('krColumn');
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < n; i++) {
+      const val = Util.randInt(0, 9);
+      const el = document.createElement('div');
+      el.className = 'kr-digit';
+      el.textContent = val;
+      frag.appendChild(el);
+      nodes.push({ el, val });
+    }
+    col.appendChild(frag);
+  }
+
+  function ensureBuffer() {
+    if (nodes.length - pointer < 10) appendDigits(40);
+  }
+
+  function highlightActive() {
+    nodes.forEach(n => n.el.classList.remove('active'));
+    if (nodes[pointer]) nodes[pointer].el.classList.add('active');
+    if (nodes[pointer + 1]) nodes[pointer + 1].el.classList.add('active');
+    if (nodes[pointer]) nodes[pointer].el.scrollIntoView({ block: 'center' });
+  }
+
+  function updateStats() {
+    document.getElementById('krCorrect').textContent = correct;
+    document.getElementById('krWrong').textContent = wrong;
+    document.getElementById('krAcc').textContent = (attempted ? Math.round((correct / attempted) * 100) : 0) + '%';
+    const elapsedMin = (DURATION_SECONDS - secondsLeft) / 60;
+    document.getElementById('krSpeed').textContent = elapsedMin > 0 ? Math.round(attempted / elapsedMin) : 0;
+  }
+
+  function submitAnswer(value) {
+    if (!running) return;
+    const expected = (nodes[pointer].val + nodes[pointer + 1].val) % 10;
+    const fb = document.getElementById('krFeedback');
+    attempted++;
+    if (value === expected) { correct++; fb.textContent = 'Benar!'; fb.className = 'kr-feedback ok'; }
+    else { wrong++; fb.textContent = `Kurang tepat (jawaban: ${expected})`; fb.className = 'kr-feedback bad'; }
+    pointer++;
+    ensureBuffer();
+    highlightActive();
+    updateStats();
+    document.getElementById('krInput').value = '';
+  }
+
+  function tick() {
+    secondsLeft--;
+    document.getElementById('krTimer').textContent = Util.formatSeconds(Math.max(0, secondsLeft));
+    updateStats();
+    if (secondsLeft <= 0) finish();
+  }
+
+  function finish() {
+    running = false;
+    clearInterval(timerHandle);
+    const fb = document.getElementById('krFeedback');
+    fb.textContent = 'Waktu habis! Skor tercatat di papan utama.'; fb.className = 'kr-feedback';
+    const acc = attempted ? Math.round((correct / attempted) * 100) : 0;
+    reportScore('kraepelin', `${correct}/${attempted} (${acc}%)`, { correct, total: attempted, pct: acc });
+  }
+
+  function start() {
+    document.getElementById('krColumn').innerHTML = '';
+    nodes = []; pointer = 0; correct = 0; wrong = 0; attempted = 0;
+    secondsLeft = DURATION_SECONDS; running = false;
+    appendDigits(30);
+    highlightActive();
+    document.getElementById('krTimer').textContent = Util.formatSeconds(secondsLeft);
+    document.getElementById('krFeedback').textContent = '';
+    updateStats();
+
+    const pad = document.getElementById('krKeypad'); pad.innerHTML = '';
+    for (let n = 0; n <= 9; n++) {
+      const b = document.createElement('button'); b.textContent = n;
+      b.addEventListener('click', () => submitAnswer(n));
+      pad.appendChild(b);
+    }
+    const startBtn = document.getElementById('krStart');
+    startBtn.onclick = () => {
+      if (running) return;
+      running = true;
+      clearInterval(timerHandle);
+      timerHandle = setInterval(tick, 1000);
+      document.getElementById('krInput').focus();
+    };
+  }
+
+  document.getElementById('krInput').addEventListener('input', e => {
+    const v = e.target.value.replace(/[^0-9]/g, '').slice(-1);
+    e.target.value = v;
+    if (v !== '') submitAnswer(parseInt(v, 10));
+  });
+  document.getElementById('krSubmit').addEventListener('click', () => {
+    const v = document.getElementById('krInput').value;
+    if (v !== '') submitAnswer(parseInt(v, 10));
+  });
+
+  return { start };
+})();
+
+/* ==========================================================================
+   ==============================  2. TPA MODULE  ===========================
+   ========================================================================== */
+const TPA = (() => {
+  const TOTAL_QUESTIONS = 10;
+  let questions = [], index = 0, correct = 0;
+
+  function genFibonacciInterleavedWithPrimes() {
+    const a = Util.randInt(1, 5), b = Util.randInt(1, 5);
+    const fib = [a, b];
+    for (let i = 0; i < 4; i++) fib.push(fib[fib.length - 1] + fib[fib.length - 2]);
+    const primeStartIdx = Util.randInt(0, 3);
+    const primes = Util.primesUpTo(primeStartIdx + 6).slice(primeStartIdx);
+    const interleaved = [];
+    for (let i = 0; i < 4; i++) { interleaved.push(fib[i]); interleaved.push(primes[i]); }
+    const answer = fib[4];
+    const commonMistakes = [fib[3] + primes[3], fib[4] + 1, fib[4] - 1, primes[4]];
+    return {
+      text: `Deret berikut menggabungkan dua pola (Fibonacci & bilangan prima) secara berselang-seling:\n${interleaved.join(',  ')},  ?\nBerapa suku Fibonacci berikutnya?`,
+      answer,
+      distractors: commonMistakes
+    };
+  }
+
+  function genGeometricNestedInArithmeticGaps() {
+    const start = Util.randInt(2, 10);
+    const diff = Util.randInt(2, 6);
+    const ratio = Util.choice([2, 3]);
+    const outer = [start, start + diff, start + 2 * diff, start + 3 * diff];
+    const seq = [];
+    outer.forEach((term, i) => { seq.push(term); if (i < outer.length - 1) seq.push(term * ratio); });
+    const answer = outer[3] * ratio;
+    const commonMistakes = [outer[3] + diff, outer[3] * (ratio + 1), outer[3] + ratio, Math.round(outer[3] * ratio * 0.5)];
+    return {
+      text: `Deret berikut menyisipkan pola geometris di antara celah pola aritmatika:\n${seq.join(',  ')},  ?`,
+      answer,
+      distractors: commonMistakes
+    };
+  }
+
+  function genArithmeticWithPrimeOffset() {
+    const start = Util.randInt(3, 12);
+    const d = Util.randInt(2, 5);
+    const primes = Util.primesUpTo(6);
+    const seq = [0, 1, 2, 3, 4].map(i => start + d * i + primes[i]);
+    const answer = start + d * 5 + primes[5];
+    const commonMistakes = [start + d * 5, seq[4] + d, seq[4] + primes[4], answer + primes[0]];
+    return {
+      text: `Setiap suku dibentuk dari pola aritmatika ditambah bilangan prima ke-i:\n${seq.join(',  ')},  ?`,
+      answer,
+      distractors: commonMistakes
+    };
+  }
+
+  function genAlternatingDualArithmetic() {
+    const startA = Util.randInt(1, 10), diffA = Util.choice([1, 2, 3, 4]);
+    const startB = Util.randInt(15, 30), diffB = Util.choice([-4, -3, -2, 2, 3]);
+    const seq = [];
+    for (let i = 0; i < 3; i++) { seq.push(startA + diffA * i); seq.push(startB + diffB * i); }
+    const answer = startA + diffA * 3;
+    const commonMistakes = [startB + diffB * 3, answer + diffA, answer - diffA, seq[4] + diffA];
+    return {
+      text: `Deret berselang-seling dua pola aritmatika independen:\n${seq.join(',  ')},  ?`,
+      answer,
+      distractors: commonMistakes
+    };
+  }
+
+  const seriesGenerators = [genFibonacciInterleavedWithPrimes, genGeometricNestedInArithmeticGaps, genArithmeticWithPrimeOffset, genAlternatingDualArithmetic];
+
+  const SUBJECTS = ['Budi', 'Andi', 'Sari', 'Rina', 'Dedi', 'Made', 'Siti', 'Joko', 'Wulan', 'Bayu', 'Rudi', 'Nina', 'Tono', 'Hendra', 'Lestari'];
+  const TRAINS = ['Argo Bromo', 'Argo Wilis', 'Turangga', 'Bima', 'Gajayana', 'Sancaka', 'Mutiara Selatan', 'Lodaya', 'Taksaka', 'Harina'];
+  const STATIONS = ['Gambir', 'Bandung', 'Yogyakarta', 'Surabaya Gubeng', 'Malang', 'Solo Balapan', 'Semarang Tawang', 'Cirebon', 'Madiun', 'Purwokerto'];
+
+  function twoDistinctStations() {
+    const a = Util.choice(STATIONS);
+    let b = Util.choice(STATIONS);
+    while (b === a) b = Util.choice(STATIONS);
+    return [a, b];
+  }
+
+  function wpSpeedDistanceTime() {
+    const subject = Util.choice(SUBJECTS), train = Util.choice(TRAINS);
+    const [sA, sB] = twoDistinctStations();
+    const speed = Util.choice([40, 50, 60, 70, 80, 90, 100]);
+    const time = Util.randInt(2, 6);
+    const distance = speed * time;
+    return {
+      text: `${subject} menaiki kereta ${train} dari Stasiun ${sA} menuju Stasiun ${sB} sejauh ${distance} km dengan kecepatan rata-rata ${speed} km/jam. Berapa jam waktu tempuhnya?`,
+      answer: time,
+      distractors: [Math.round(distance * speed / 1000), time + 1, time - 1 <= 0 ? time + 2 : time - 1, Math.round(distance / (speed + 10))]
+    };
+  }
+
+  function wpTicketDiscount() {
+    const subject = Util.choice(SUBJECTS), train = Util.choice(TRAINS);
+    const qty = Util.randInt(2, 6);
+    const price = Util.choice([50000, 75000, 100000, 125000, 150000, 200000]);
+    const pct = Util.choice([10, 15, 20, 25]);
+    const total = qty * price * (1 - pct / 100);
+    return {
+      text: `${subject} membeli ${qty} tiket kereta ${train} dengan harga Rp${price.toLocaleString('id-ID')} per tiket. Terdapat diskon ${pct}% untuk pembelian ini. Berapa total yang harus dibayar (Rp)?`,
+      answer: total,
+      distractors: [
+        qty * price,
+        qty * price * (1 + pct / 100),
+        price * (1 - pct / 100),
+        Math.round(total * 1.1)
+      ]
+    };
+  }
+
+  function wpSeatAvailability() {
+    const rows = Util.randInt(10, 20);
+    const seatsPerRow = Util.choice([4, 5, 6]);
+    const totalSeats = rows * seatsPerRow;
+    const occupied = Util.randInt(Math.floor(totalSeats * 0.3), Math.floor(totalSeats * 0.8));
+    const empty = totalSeats - occupied;
+    return {
+      text: `Sebuah gerbong kereta eksekutif memiliki ${rows} baris dengan ${seatsPerRow} kursi tiap baris. Jika ${occupied} kursi sudah terisi penumpang, berapa kursi yang masih kosong?`,
+      answer: empty,
+      distractors: [totalSeats, Math.abs(rows + seatsPerRow - occupied), occupied - empty, empty + seatsPerRow]
+    };
+  }
+
+  function wpAverageSpeedTwoLegs() {
+    const subject = Util.choice(SUBJECTS);
+    const t = Util.randInt(1, 4);
+    const evenSpeeds = [40, 60, 80, 100, 120];
+    const s1 = Util.choice(evenSpeeds);
+    let s2 = Util.choice(evenSpeeds);
+    const avg = (s1 + s2) / 2;
+    return {
+      text: `${subject} menempuh perjalanan kereta selama ${t} jam dengan kecepatan ${s1} km/jam, lalu dilanjutkan ${t} jam lagi dengan kecepatan ${s2} km/jam. Berapa kecepatan rata-rata (km/jam) untuk seluruh perjalanan?`,
+      answer: avg,
+      distractors: [s1, s2, Math.round((s1 + s2) / 2) + 5, Math.abs(s1 - s2)]
+    };
+  }
+
+  const wordGenerators = [wpSpeedDistanceTime, wpTicketDiscount, wpSeatAvailability, wpAverageSpeedTwoLegs];
+
+  function buildQuestionSet() {
+    const list = [];
+    for (let i = 0; i < TOTAL_QUESTIONS / 2; i++) list.push({ kind: 'series', ...Util.choice(seriesGenerators)() });
+    for (let i = 0; i < TOTAL_QUESTIONS / 2; i++) list.push({ kind: 'cerita', ...Util.choice(wordGenerators)() });
+    return Util.shuffle(list).map(q => {
+      const uniqueDistractors = [...new Set(q.distractors.filter(d => d !== q.answer))];
+      while (uniqueDistractors.length < 4) {
+        const filler = Util.numericDistractors(q.answer, 1, Math.max(3, Math.round(Math.abs(q.answer) * 0.1) + 1))[0];
+        if (!uniqueDistractors.includes(filler) && filler !== q.answer) uniqueDistractors.push(filler);
+      }
+      return { text: q.text, answer: q.answer, options: Util.shuffle([q.answer, ...uniqueDistractors.slice(0, 4)]) };
+    });
+  }
+
+  function fmt(n) { return Number.isInteger(n) ? n.toLocaleString('id-ID') : n.toFixed(2); }
+
+  function renderQuestion() {
+    const area = document.getElementById('tpaArea');
+    const q = questions[index];
+    area.innerHTML = `
+      <div class="q-card">
+        <div class="q-progress">Soal ${index + 1} dari ${questions.length} &nbsp;|&nbsp; Benar: ${correct}</div>
+        <div class="q-text">${q.text}</div>
+        <div class="q-options">${q.options.map((opt, i) => `<button class="opt-btn" data-i="${i}">${fmt(opt)}</button>`).join('')}</div>
+        <div class="q-footer"><span></span><button class="btn secondary" id="tpaNext" style="display:none;">Lanjut &rarr;</button></div>
+      </div>`;
+    area.querySelectorAll('.opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chosen = q.options[parseInt(btn.dataset.i, 10)];
+        area.querySelectorAll('.opt-btn').forEach(b => b.disabled = true);
+        if (chosen === q.answer) { btn.classList.add('correct'); correct++; }
+        else {
+          btn.classList.add('wrong');
+          area.querySelectorAll('.opt-btn').forEach(b => { if (q.options[parseInt(b.dataset.i, 10)] === q.answer) b.classList.add('correct'); });
+        }
+        const nextBtn = document.getElementById('tpaNext');
+        nextBtn.style.display = 'inline-block';
+        nextBtn.onclick = () => { index++; if (index >= questions.length) finish(); else renderQuestion(); };
+      });
+    });
+  }
+
+  function finish() {
+    const area = document.getElementById('tpaArea');
+    reportScore('tpa', `${correct}/${questions.length}`, { correct, total: questions.length, pct: questions.length ? Math.round(correct / questions.length * 100) : 0 });
+    renderResultScreen(area, { correct, total: questions.length, extraStats: [{ value: 'Berlapis + Cerita', label: 'Jenis Soal' }], onRetry: () => start() });
+  }
+
+  function start() { questions = buildQuestionSet(); index = 0; correct = 0; renderQuestion(); }
+  return { start };
+})();
+
+/* ==========================================================================
+   ============================  3. SPATIAL LOGIC  ==========================
+   ========================================================================== */
+const Spatial = (() => {
+  const TOTAL_QUESTIONS = 6;
+  const SIZE = 4;
+  const CELL = 24;
+  let questions = [], index = 0, correct = 0;
+
+  function emptyMatrix() { return Array.from({ length: SIZE }, () => Array(SIZE).fill(0)); }
+  function randomShape() {
+    const m = emptyMatrix();
+    const fillCount = Util.randInt(5, 8);
+    const cells = Util.shuffle([...Array(SIZE * SIZE).keys()]).slice(0, fillCount);
+    cells.forEach(c => { m[Math.floor(c / SIZE)][c % SIZE] = 1; });
+    return m;
+  }
+  function rotate90(m) { const n = emptyMatrix(); for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) n[c][SIZE - 1 - r] = m[r][c]; return n; }
+  function flipH(m) { return m.map(row => [...row].reverse()); }
+  function flipV(m) { return [...m].reverse(); }
+  function key(m) { return m.flat().join(''); }
+  function mutate(m, flips = 1) { const c = m.map(r => [...r]); for (let i = 0; i < flips; i++) { const r = Util.randInt(0, SIZE - 1), col = Util.randInt(0, SIZE - 1); c[r][col] = c[r][col] ? 0 : 1; } return c; }
+  function overlap(a, b) { return a.map((row, r) => row.map((v, c) => (v || b[r][c]) ? 1 : 0)); }
+
+  const TRANSFORM_LABELS = { r90: 'Rotasi 90°', r180: 'Rotasi 180°', r270: 'Rotasi 270°', fh: 'Cerminan Horizontal', fv: 'Cerminan Vertikal' };
+  function computeTransform(m, type) {
+    if (type === 'r90') return rotate90(m);
+    if (type === 'r180') return rotate90(rotate90(m));
+    if (type === 'r270') return rotate90(rotate90(rotate90(m)));
+    if (type === 'fh') return flipH(m);
+    return flipV(m);
+  }
+
+  function addCandidate(pool, candidate, correctMatrix) {
+    const k = key(candidate);
+    if (k !== key(correctMatrix) && !pool.has(k)) pool.set(k, candidate);
+  }
+
+  function buildQuestion() {
+    let original, correctType, correctMatrix, distractors, guard = 0;
+    do {
+      original = randomShape();
+      correctType = Util.choice(Object.keys(TRANSFORM_LABELS));
+      correctMatrix = computeTransform(original, correctType);
+      const pool = new Map();
+      const otherTypes = Object.keys(TRANSFORM_LABELS).filter(t => t !== correctType);
+      addCandidate(pool, mutate(correctMatrix, 1), correctMatrix);
+      addCandidate(pool, mutate(computeTransform(original, Util.choice(otherTypes)), 1), correctMatrix);
+      addCandidate(pool, overlap(original, computeTransform(original, Util.choice(otherTypes))), correctMatrix);
+      addCandidate(pool, mutate(correctMatrix, 2), correctMatrix);
+      distractors = [...pool.values()];
+      guard++;
+    } while (distractors.length < 4 && guard < 30);
+
+    const options = Util.shuffle([correctMatrix, ...distractors.slice(0, 4)]);
+    return { original, correctMatrix, correctLabel: TRANSFORM_LABELS[correctType], options };
+  }
+
+  function drawMatrix(canvas, matrix) {
+    const ctx = canvas.getContext('2d');
+    const size = SIZE * CELL;
+    canvas.width = size; canvas.height = size;
+    const styles = getComputedStyle(document.documentElement);
+    ctx.clearRect(0, 0, size, size);
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        ctx.fillStyle = matrix[r][c] ? styles.getPropertyValue('--accent').trim() : styles.getPropertyValue('--bg-inset').trim();
+        ctx.strokeStyle = styles.getPropertyValue('--border').trim();
+        ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+        ctx.strokeRect(c * CELL, r * CELL, CELL, CELL);
+      }
+    }
+  }
+
+  function renderQuestion() {
+    const area = document.getElementById('spatialArea');
+    const q = questions[index];
+    const letters = ['A', 'B', 'C', 'D', 'E'];
+    area.innerHTML = `
+      <div class="q-card">
+        <div class="q-progress">Soal ${index + 1} dari ${questions.length} &nbsp;|&nbsp; Benar: ${correct}</div>
+        <div class="q-text">Bentuk asli digambar di kanvas. Pilih hasil transformasi (rotasi/refleksi) yang benar dari bentuk asli:</div>
+        <div class="shape-canvas-wrap" style="margin-bottom:20px;"><canvas id="spOriginal"></canvas></div>
+        <div class="q-options">
+          ${q.options.map((mat, i) => `
+            <button class="opt-btn spatial-opt" data-i="${i}">
+              <span class="opt-label">Opsi ${letters[i]}</span>
+              <canvas class="opt-canvas" data-idx="${i}"></canvas>
+            </button>`).join('')}
+        </div>
+        <div class="q-footer"><span></span><button class="btn secondary" id="spNext" style="display:none;">Lanjut &rarr;</button></div>
+      </div>`;
+    drawMatrix(document.getElementById('spOriginal'), q.original);
+    area.querySelectorAll('.opt-canvas').forEach(cv => drawMatrix(cv, q.options[parseInt(cv.dataset.idx, 10)]));
+    area.querySelectorAll('.opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chosen = q.options[parseInt(btn.dataset.i, 10)];
+        area.querySelectorAll('.opt-btn').forEach(b => b.disabled = true);
+        if (key(chosen) === key(q.correctMatrix)) { btn.classList.add('correct'); correct++; }
+        else {
+          btn.classList.add('wrong');
+          area.querySelectorAll('.opt-btn').forEach(b => { if (key(q.options[parseInt(b.dataset.i, 10)]) === key(q.correctMatrix)) b.classList.add('correct'); });
+        }
+        const nextBtn = document.getElementById('spNext');
+        nextBtn.style.display = 'inline-block';
+        nextBtn.onclick = () => { index++; if (index >= questions.length) finish(); else renderQuestion(); };
+      });
+    });
+  }
+
+  function finish() {
+    const area = document.getElementById('spatialArea');
+    reportScore('spatial', `${correct}/${questions.length}`, { correct, total: questions.length, pct: questions.length ? Math.round(correct / questions.length * 100) : 0 });
+    renderResultScreen(area, { correct, total: questions.length, extraStats: [{ value: 'Kanvas 4x4', label: 'Format Soal' }], onRetry: () => start() });
+  }
+  function start() { questions = Array.from({ length: TOTAL_QUESTIONS }, buildQuestion); index = 0; correct = 0; renderQuestion(); }
+  return { start };
+})();
+
+/* ==========================================================================
+   ==============================  4. MEMORY TEST  ==========================
+   ========================================================================== */
+const Memory = (() => {
+  const STUDY_SECONDS = 45;
+  const QUIZ_QUESTIONS = 8;
+  const TRAIN_SERIES = ['Argo', 'Bima', 'Gajayana', 'Turangga', 'Sancaka', 'Mutiara', 'Lodaya', 'Taksaka', 'Harina', 'Serayu'];
+  const SEAT_CLASSES = ['Eko', 'Bisnis', 'Eksekutif'];
+  const FIRST_NAMES = ['Budi', 'Andi', 'Sari', 'Rina', 'Dedi', 'Made', 'Siti', 'Joko', 'Wulan', 'Bayu', 'Rudi', 'Nina', 'Tono', 'Hendra', 'Lestari'];
+  const LAST_NAMES = ['Saputra', 'Wijaya', 'Kusuma', 'Pratama', 'Santoso', 'Utami', 'Nugroho', 'Hartono', 'Wibowo', 'Anggraini'];
+
+  let cachedEntities = [];
+  let studySecondsLeft = STUDY_SECONDS, studyTimer = null;
+  let quizQuestions = [], index = 0, correct = 0;
+
+  function generateTrainCode() { return `KA-${Util.choice(TRAIN_SERIES)}-${Util.randInt(100, 999)}`; }
+  function generateSeat() { return `${Util.choice(SEAT_CLASSES)}-${Util.randInt(1, 80)}${String.fromCharCode(65 + Util.randInt(0, 4))}`; }
+  function generatePassenger() { return `${Util.choice(FIRST_NAMES)} ${Util.choice(LAST_NAMES)}`; }
+
+  function pickEntities() {
+    const seen = new Set();
+    const list = [];
+    let guard = 0;
+    while (list.length < 10 && guard < 500) {
+      guard++;
+      const entity = { trainCode: generateTrainCode(), seat: generateSeat(), passenger: generatePassenger() };
+      const k = `${entity.trainCode}|${entity.seat}`;
+      if (!seen.has(k)) { seen.add(k); list.push(entity); }
+    }
+    cachedEntities = list;
+  }
+
+  function renderStudyPhase() {
+    const area = document.getElementById('memoryArea');
+    area.innerHTML = `
+      <div class="q-card">
+        <div class="q-text">Hafalkan 10 data perjalanan berikut. Kuis muncul setelah waktu habis (atau tekan lanjut).</div>
+        <div class="mem-progress-bar"><div class="mem-progress-fill" id="memBar"></div></div>
+        <div style="font-family:var(--font-mono); color:var(--accent); margin-bottom:14px;" id="memTimeLabel"></div>
+        <div class="mem-grid">${cachedEntities.map(e => `<div class="mem-entity">Kereta: <b>${e.trainCode}</b><br>Kursi: <b>${e.seat}</b><br>Penumpang: <b>${e.passenger}</b></div>`).join('')}</div>
+        <div class="q-footer"><span></span><button class="btn secondary" id="memSkip">Saya Sudah Hafal &rarr;</button></div>
+      </div>`;
+    document.getElementById('memSkip').addEventListener('click', () => beginQuiz());
+    updateStudyUI();
+    clearInterval(studyTimer);
+    studyTimer = setInterval(() => {
+      studySecondsLeft--; updateStudyUI();
+      if (studySecondsLeft <= 0) { clearInterval(studyTimer); beginQuiz(); }
+    }, 1000);
+  }
+  function updateStudyUI() {
+    const pct = Math.max(0, (studySecondsLeft / STUDY_SECONDS) * 100);
+    const bar = document.getElementById('memBar'); const label = document.getElementById('memTimeLabel');
+    if (bar) bar.style.width = pct + '%';
+    if (label) label.textContent = `Sisa waktu: ${studySecondsLeft}s`;
+  }
+
+  function buildQuizQuestions() {
+    const templates = [
+      (rec, others) => ({ text: `Siapa nama penumpang yang duduk di kursi ${rec.seat}?`, answer: rec.passenger, options: Util.shuffle([rec.passenger, ...Util.shuffle(others.map(o => o.passenger)).slice(0, 3)]) }),
+      (rec, others) => ({ text: `Kode kereta apa yang ditumpangi oleh ${rec.passenger}?`, answer: rec.trainCode, options: Util.shuffle([rec.trainCode, ...Util.shuffle(others.map(o => o.trainCode)).slice(0, 3)]) }),
+      (rec, others) => ({ text: `Di kursi manakah ${rec.passenger} duduk?`, answer: rec.seat, options: Util.shuffle([rec.seat, ...Util.shuffle(others.map(o => o.seat)).slice(0, 3)]) }),
+    ];
+    const qs = [];
+    for (let i = 0; i < QUIZ_QUESTIONS; i++) {
+      const rec = Util.choice(cachedEntities);
+      const others = cachedEntities.filter(o => o !== rec);
+      qs.push(Util.choice(templates)(rec, others));
+    }
+    return qs;
+  }
+
+  function renderQuizQuestion() {
+    const area = document.getElementById('memoryArea');
+    const q = quizQuestions[index];
+    area.innerHTML = `
+      <div class="q-card">
+        <div class="q-progress">Soal ${index + 1} dari ${quizQuestions.length} &nbsp;|&nbsp; Benar: ${correct}</div>
+        <div class="q-text">${q.text}</div>
+        <div class="q-options">${q.options.map((opt, i) => `<button class="opt-btn" data-i="${i}">${opt}</button>`).join('')}</div>
+        <div class="q-footer"><span></span><button class="btn secondary" id="memNext" style="display:none;">Lanjut &rarr;</button></div>
+      </div>`;
+    area.querySelectorAll('.opt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chosen = q.options[parseInt(btn.dataset.i, 10)];
+        area.querySelectorAll('.opt-btn').forEach(b => b.disabled = true);
+        if (chosen === q.answer) { btn.classList.add('correct'); correct++; }
+        else {
+          btn.classList.add('wrong');
+          area.querySelectorAll('.opt-btn').forEach(b => { if (q.options[parseInt(b.dataset.i, 10)] === q.answer) b.classList.add('correct'); });
+        }
+        const nextBtn = document.getElementById('memNext');
+        nextBtn.style.display = 'inline-block';
+        nextBtn.onclick = () => { index++; if (index >= quizQuestions.length) finish(); else renderQuizQuestion(); };
+      });
+    });
+  }
+
+  function beginQuiz() { quizQuestions = buildQuizQuestions(); index = 0; correct = 0; renderQuizQuestion(); }
+  function finish() {
+    const area = document.getElementById('memoryArea');
+    reportScore('memory', `${correct}/${quizQuestions.length}`, { correct, total: quizQuestions.length, pct: quizQuestions.length ? Math.round(correct / quizQuestions.length * 100) : 0 });
+    renderResultScreen(area, { correct, total: quizQuestions.length, extraStats: [{ value: cachedEntities.length, label: 'Data Dihafal' }], onRetry: () => start() });
+  }
+  function start() { clearInterval(studyTimer); pickEntities(); studySecondsLeft = STUDY_SECONDS; renderStudyPhase(); }
+  return { start };
+})();
+
+/* ==========================================================================
+   ========================  5. PERSONALITY INVENTORY  ======================
+   ========================================================================== */
+const Personality = (() => {
+  const TOTAL_QUESTIONS = 15;
+
+  const TRAIT_VOCAB = {
+    'Kepemimpinan': {
+      actions: ['Saya mengambil inisiatif', 'Saya senang memimpin diskusi', 'Saya berani mengambil keputusan', 'Saya membagi tugas kepada tim', 'Saya menetapkan target yang jelas', 'Saya memberi arahan'],
+      contexts: ['ketika situasi tidak menentu', 'saat proyek menemui kendala', 'di tengah rapat tim', 'ketika tidak ada yang mau memulai', 'pada masa tenggat waktu', 'saat anggota tim kebingungan']
+    },
+    'Ketelitian': {
+      actions: ['Saya memeriksa ulang setiap detail', 'Saya membuat daftar periksa', 'Saya menghindari kesalahan kecil', 'Saya membandingkan data dua kali', 'Saya menyusun dokumen secara rapi', 'Saya memastikan angka sudah sesuai'],
+      contexts: ['sebelum menyerahkan laporan', 'saat mengerjakan tugas administratif', 'ketika memeriksa jadwal kereta', 'sebelum menekan tombol kirim', 'saat menyusun anggaran', 'ketika mengisi formulir penting']
+    },
+    'Ketahanan Mental': {
+      actions: ['Saya tetap tenang', 'Saya bangkit dengan cepat', 'Saya tidak mudah menyerah', 'Saya mengelola stres dengan baik', 'Saya tetap fokus', 'Saya menerima kritik secara terbuka'],
+      contexts: ['ketika menghadapi kegagalan', 'saat mendapat tekanan pekerjaan', 'ketika rencana berubah mendadak', 'saat menghadapi keluhan pelanggan', 'ketika beban kerja meningkat', 'saat menghadapi kritik atasan']
+    },
+    'Kerja Sama Tim': {
+      actions: ['Saya mendengarkan pendapat rekan', 'Saya membantu rekan yang kesulitan', 'Saya berbagi informasi secara terbuka', 'Saya menghargai kontribusi orang lain', 'Saya mudah beradaptasi dengan gaya kerja tim', 'Saya mengutamakan tujuan bersama'],
+      contexts: ['saat bekerja dalam kelompok', 'ketika menyelesaikan proyek bersama', 'saat terjadi perbedaan pendapat', 'ketika beban kerja tim tidak merata', 'saat rekan baru bergabung', 'ketika target tim terancam meleset']
+    },
+    'Adaptabilitas': {
+      actions: ['Saya cepat menyesuaikan diri', 'Saya terbuka pada cara kerja baru', 'Saya fleksibel terhadap perubahan jadwal', 'Saya mudah mempelajari sistem baru', 'Saya menerima perubahan tanpa banyak keluhan', 'Saya menyesuaikan rencana dengan cepat'],
+      contexts: ['ketika ada perubahan kebijakan mendadak', 'saat berpindah ke lingkungan kerja baru', 'ketika teknologi yang digunakan berganti', 'saat prosedur kerja direvisi', 'ketika jadwal tugas berubah tiba-tiba', 'saat harus mengisi peran yang berbeda']
+    }
+  };
+
+  function buildFragmentBank() {
+    const bank = {};
+    Object.entries(TRAIT_VOCAB).forEach(([trait, { actions, contexts }]) => {
+      const fragments = [];
+      actions.forEach(a => contexts.forEach(c => fragments.push(`${a} ${c}.`)));
+      bank[trait] = Util.shuffle(fragments);
+    });
+    return bank;
+  }
+
+  let fragmentBank = {};
+  let cursor = {};
+  let scores = {};
+  let questions = [];
+  let index = 0;
+
+  function traitsWithFragmentsLeft() {
+    return Object.keys(fragmentBank).filter(t => cursor[t] < fragmentBank[t].length);
+  }
+
+  function buildQuestions() {
+    const qs = [];
+    for (let i = 0; i < TOTAL_QUESTIONS; i++) {
+      const available = traitsWithFragmentsLeft();
+      if (available.length < 2) break;
+      const [traitA, traitB] = Util.shuffle(available).slice(0, 2);
+      const textA = fragmentBank[traitA][cursor[traitA]++];
+      const textB = fragmentBank[traitB][cursor[traitB]++];
+      qs.push({ traitA, textA, traitB, textB });
+    }
+    return qs;
+  }
+
+  function renderQuestion() {
+    const area = document.getElementById('personalityArea');
+    const q = questions[index];
+    area.innerHTML = `
+      <div class="q-card">
+        <div class="q-progress">Pernyataan ${index + 1} dari ${questions.length}</div>
+        <div class="q-text">Mana yang lebih menggambarkan diri Anda?</div>
+        <div class="ip-options">
+          <button class="ip-card" data-side="A"><span class="ip-letter">A</span><span>${q.textA}</span></button>
+          <button class="ip-card" data-side="B"><span class="ip-letter">B</span><span>${q.textB}</span></button>
+        </div>
+      </div>`;
+    area.querySelectorAll('.ip-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const side = btn.dataset.side;
+        const trait = side === 'A' ? q.traitA : q.traitB;
+        scores[trait] = (scores[trait] || 0) + 1;
+        btn.classList.add('chosen');
+        area.querySelectorAll('.ip-card').forEach(b => b.disabled = true);
+        setTimeout(() => { index++; if (index >= questions.length) finish(); else renderQuestion(); }, 220);
+      });
+    });
+  }
+
+  let radarChart = null;
+  function finish() {
+    const area = document.getElementById('personalityArea');
+    const traitNames = Object.keys(TRAIT_VOCAB);
+    const dataValues = traitNames.map(t => scores[t] || 0);
+    const dominant = traitNames.reduce((best, t) => (scores[t] || 0) > (scores[best] || 0) ? t : best, traitNames[0]);
+
+    reportScore('personality', `${questions.length} pasangan dijawab`);
+    const slot = renderResultScreen(area, {
+      correct: 0, total: 0, customBody: true,
+      extraStats: traitNames.map(t => ({ value: scores[t] || 0, label: t })),
+      onRetry: () => start()
+    });
+    slot.innerHTML = `
+      <div class="radar-wrap"><canvas id="radarCanvas"></canvas></div>
+      <div class="dominant-trait">Trait paling menonjol: ${dominant}</div>`;
+
+    if (radarChart) radarChart.destroy();
+    const ctx = document.getElementById('radarCanvas').getContext('2d');
+    const styles = getComputedStyle(document.documentElement);
+    radarChart = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: traitNames,
+        datasets: [{
+          label: 'Skor Kepribadian',
+          data: dataValues,
+          backgroundColor: 'rgba(242,169,59,0.25)',
+          borderColor: styles.getPropertyValue('--accent').trim(),
+          pointBackgroundColor: styles.getPropertyValue('--accent').trim()
+        }]
+      },
+      options: {
+        scales: { r: { angleLines: { color: styles.getPropertyValue('--border').trim() }, grid: { color: styles.getPropertyValue('--border').trim() }, pointLabels: { color: styles.getPropertyValue('--text').trim() }, ticks: { display: false } } },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  function start() {
+    fragmentBank = buildFragmentBank();
+    cursor = {}; scores = {};
+    Object.keys(fragmentBank).forEach(t => { cursor[t] = 0; scores[t] = 0; });
+    questions = buildQuestions();
+    index = 0;
+    renderQuestion();
+  }
+
+  return { start };
+})();
+</script>
+</body>
+</html>

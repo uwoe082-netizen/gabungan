@@ -1,0 +1,96 @@
+:root {
+  /* === CORE DARKS === */
+  --bg-void:        #09090b;
+  --bg-surface:     #111113;
+  --bg-elevated:    #1a1a1f;
+  --bg-hover:       #222228;
+
+  /* === ACCENT: CRIMSON RAGE (Primary) === */
+  --crimson-500:    #dc2626;
+  --crimson-400:    #ef4444;
+  --crimson-600:    #b91c1c;
+  --crimson-glow:   rgba(220, 38, 38, 0.15);
+  --crimson-ghost:  rgba(220, 38, 38, 0.08);
+
+  /* === ACCENT: ROYAL PURPLE (XP & Level) === */
+  --purple-500:     #8b5cf6;
+  --purple-400:     #a78bfa;
+  --purple-glow:    rgba(139, 92, 246, 0.15);
+
+  /* === ACCENT: EMERALD (Success/Completed) === */
+  --emerald-500:    #10b981;
+  --emerald-400:    #34d399;
+  --emerald-glow:   rgba(16, 185, 129, 0.15);
+
+  /* === ACCENT: AMBER (Warning/Streak) === */
+  --amber-500:      #f59e0b;
+  --amber-400:      #fbbf24;
+
+  /* === ACCENT: BLUE (Leg Day) === */
+  --blue-500:       #3b82f6;
+  --blue-400:       #60a5fa;
+  --blue-glow:      rgba(59, 130, 246, 0.15);
+
+  /* === TEXT HIERARCHY === */
+  --text-primary:   #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted:     #52525b;
+  --text-accent:    var(--crimson-400);
+
+  /* === BORDERS & DIVIDERS === */
+  --border-subtle:  #27272a;
+  --border-default: #3f3f46;
+
+  /* === GRADIENTS === */
+  --gradient-fire:    linear-gradient(135deg, #dc2626, #f59e0b);
+  --gradient-villain: linear-gradient(135deg, #8b5cf6, #dc2626);
+  --gradient-dark:    linear-gradient(180deg, #111113, #09090b);
+
+  /* === SHADOWS === */
+  --shadow-card:        0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow-red:    0 0 30px rgba(220, 38, 38, 0.2);
+  --shadow-glow-purple: 0 0 30px rgba(139, 92, 246, 0.2);
+  --shadow-glow-amber:  0 0 30px rgba(245, 158, 11, 0.2);
+  --shadow-glow-emerald:0 0 30px rgba(16, 185, 129, 0.2);
+
+  /* === SPACING SCALE === */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* === BORDER RADIUS === */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* === TRANSITIONS === */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* === TYPOGRAPHY === */
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* === Z-INDEX === */
+  --z-nav: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+  --z-celebration: 400;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

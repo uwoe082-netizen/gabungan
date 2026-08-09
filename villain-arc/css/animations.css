@@ -1,0 +1,108 @@
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.25); }
+  50% { box-shadow: 0 0 36px rgba(220, 38, 38, 0.55); }
+}
+
+@keyframes checkbox-pulse {
+  0% { transform: rotate(45deg) scale(1); }
+  50% { transform: rotate(45deg) scale(1.25); }
+  100% { transform: rotate(45deg) scale(1); }
+}
+
+@keyframes xp-float-up {
+  0% { opacity: 0; transform: translateY(0); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-36px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes glitch-flicker {
+  0%, 92%, 100% { opacity: 0; }
+  93% { opacity: 0.7; transform: translateX(-2px); }
+  95% { opacity: 0; }
+  96% { opacity: 0.5; transform: translateX(2px); }
+  97% { opacity: 0; }
+}
+
+@keyframes glitch-text {
+  0% { opacity: 0; transform: scale(0.9); filter: blur(4px); }
+  40% { opacity: 1; transform: scale(1.03); filter: blur(0); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+  100% { transform: scale(1); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes breathing-glow {
+  0%, 100% { filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.3)); }
+  50% { filter: drop-shadow(0 0 24px rgba(139, 92, 246, 0.6)); }
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-transition {
+  animation: page-in var(--transition-slow);
+}
+
+.fade-in-up {
+  animation: fade-in-up var(--transition-slow) both;
+}
+
+.idle-float {
+  animation: float-idle 3s ease-in-out infinite;
+}
+
+.idle-glow {
+  animation: breathing-glow 3s ease-in-out infinite;
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+.confetti-piece {
+  position: fixed;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  z-index: var(--z-celebration);
+  pointer-events: none;
+  animation: confetti-fall 2.2s ease-in forwards;
+}
+
+@keyframes screen-flash {
+  0% { opacity: 0; }
+  15% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+.screen-flash {
+  position: fixed;
+  inset: 0;
+  background: var(--gradient-fire);
+  z-index: 350;
+  pointer-events: none;
+  animation: screen-flash 500ms ease-out forwards;
+}
