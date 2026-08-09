@@ -375,31 +375,49 @@ const App = {
       const ex = day.exercises.find((e) => e.id === exerciseId);
       if (ex && ex.inputType === "reps") {
         if (ex.hasTimer) await this.runCountdown(ex.name, 60);
-        const reps = await this.promptForReps(ex.name);
-        if (reps !== null) {
-          // Simpan nilai terbaru untuk hari ini — jangan menumpuk (push) histori
-          // duplikat setiap kali exercise di-uncheck lalu di-check ulang.
-          entry.reps = [reps];
+
+        // Banyak exercise punya >1 set (lihat field `sets` + catatan "Catat reps
+        // setiap set" di data.js) — sebelumnya cuma ditanya SEKALI untuk seluruh
+        // exercise. Sekarang ditanya per set, dengan rest timer di antara set
+        // (bukan setelah set terakhir). Untuk exercise dengan sets:1 (termasuk
+        // tes KAI), perilakunya sama persis seperti sebelumnya — tanya sekali.
+        const setsCount = ex.sets || 1;
+        const setReps = [];
+        for (let s = 1; s <= setsCount; s++) {
+          const label = setsCount > 1 ? `${ex.name} — Set ${s}/${setsCount}` : ex.name;
+          const reps = await this.promptForReps(label);
+          if (reps === null) break;
+          setReps.push(reps);
 
           const isPR = Gamification.updatePersonalRecord(exerciseId, ex.name, reps);
           if (isPR) {
             Gamification.awardXP(XP_RULES.NEW_PR, "New PR");
             UI.toast(`🏆 NEW PR! ${ex.name}: ${reps}`);
           }
-          if (isPR && reps >= 100) {
-            const unlocked = await Gamification.checkAchievements({ newPR: true, singleSessionReps: reps });
-            unlocked.forEach((id) => this.announceAchievement(id));
-          }
           if (exerciseId === "kai-pushup-test" || exerciseId === "kai-situp-test") {
             await this.saveKaiTest(exerciseId, reps, dateKey);
           }
+          if (s < setsCount) await this.runRestTimer();
+        }
+
+        if (setReps.length > 0) {
+          // Simpan reps tiap set untuk hari ini — jangan menumpuk (push) histori
+          // duplikat setiap kali exercise di-uncheck lalu di-check ulang.
+          entry.reps = setReps;
 
           // Counter kumulatif (total reps) hanya boleh bertambah SEKALI per
           // exercise per hari, supaya uncheck→check ulang tidak menggandakan angka.
           if (!entry.effectsApplied) {
             entry.effectsApplied = true;
             if (exerciseId.includes("pushup") || exerciseId === "pushup-failure") {
-              AppData.setTotalPushupReps(AppData.getTotalPushupReps() + reps);
+              const sessionTotal = setReps.reduce((a, b) => a + b, 0);
+              AppData.setTotalPushupReps(AppData.getTotalPushupReps() + sessionTotal);
+              // "century-club" — 100 reps KUMULATIF dalam 1 sesi failure, jadi
+              // dicek dari total semua set hari ini, bukan satu set tunggal.
+              if (sessionTotal >= 100) {
+                const unlocked = await Gamification.checkAchievements({ pushupSessionTotal: sessionTotal });
+                unlocked.forEach((id) => this.announceAchievement(id));
+              }
             }
           }
         }
@@ -417,7 +435,7 @@ const App = {
       // hilang gara-gara kotak centang dibatalkan.
       if (entry.effectsApplied) {
         if (exerciseId.includes("pushup") || exerciseId === "pushup-failure") {
-          const revertAmount = entry.reps[0] || 0;
+          const revertAmount = (entry.reps || []).reduce((a, b) => a + b, 0);
           AppData.setTotalPushupReps(Math.max(0, AppData.getTotalPushupReps() - revertAmount));
         }
         entry.effectsApplied = false;
@@ -585,6 +603,39 @@ const App = {
           }
         });
       });
+    });
+  },
+
+  // Rest timer di antara set (bukan tes KAI). Beda dari runCountdown: auto-mulai
+  // begitu modal terbuka (user baru selesai satu set, tidak perlu klik "mulai"
+  // lagi), dan cuma punya tombol Skip.
+  runRestTimer(seconds = RestTimer.defaultSeconds) {
+    return new Promise((resolve) => {
+      UI.openModal(`
+        <div class="modal-handle"></div>
+        <div class="timer-page" style="min-height:auto;padding:var(--space-lg) 0">
+          <div class="timer-exercise-name">ISTIRAHAT. TARIK NAPAS.</div>
+          <div class="timer-display" id="rest-countdown-display">${Timer.formatTime(seconds)}</div>
+          <div class="timer-controls">
+            <button class="btn btn-ghost" id="rest-skip">Skip Istirahat →</button>
+          </div>
+        </div>
+      `);
+      const display = document.getElementById("rest-countdown-display");
+      const skipBtn = document.getElementById("rest-skip");
+      const finish = () => { RestTimer.stop(); UI.closeModal(); resolve(); };
+      skipBtn.addEventListener("click", finish);
+      RestTimer.start(
+        seconds,
+        (remaining) => {
+          if (!display) return;
+          display.textContent = Timer.formatTime(remaining);
+          const zone = Timer.getZone(remaining, seconds);
+          display.classList.toggle("timer-warn", zone === "warn");
+          display.classList.toggle("timer-critical", zone === "critical");
+        },
+        () => { UI.toast("Istirahat selesai. Set berikutnya."); finish(); }
+      );
     });
   },
 
