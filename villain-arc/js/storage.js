@@ -39,9 +39,10 @@ const DEFAULT_SETTINGS = {
 // Tidak pernah dikirim ke server manapun milik VILLAIN ARC (tidak ada server).
 const DEFAULT_AI_SETTINGS = {
   enabled: false,
-  provider: "anthropic", // "anthropic" | "openai"
+  provider: "anthropic", // "anthropic" | "openai" | "gemini"
   apiKey: "",
-  model: "claude-sonnet-5"
+  model: "claude-sonnet-5",
+  autoApply: false // true = usulan perubahan jadwal/target/notifikasi langsung dieksekusi tanpa konfirmasi
 };
 
 const Store = {

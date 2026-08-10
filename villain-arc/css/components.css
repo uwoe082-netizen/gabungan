@@ -424,6 +424,14 @@
   border-color: var(--crimson-glow);
   color: var(--crimson-400);
 }
+.coach-bubble--proposal {
+  align-self: flex-start;
+  width: 100%;
+  max-width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--crimson-glow);
+  white-space: normal;
+}
 .coach-input-row {
   display: flex;
   gap: var(--space-sm);

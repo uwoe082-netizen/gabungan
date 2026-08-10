@@ -9,7 +9,8 @@ const App = {
     activeTimerExercise: null,
     restTimerActive: false,
     exerciseEditDay: null,
-    exerciseEditList: []
+    exerciseEditList: [],
+    aiProposals: {}
   },
 
   async init() {
@@ -966,12 +967,21 @@ const App = {
     }
 
     try {
-      const reply = await AICoach.sendMessage(text);
+      const { text: reply, proposals, autoApply } = await AICoach.sendMessage(text);
       const pending = document.getElementById("coach-pending");
       if (pending) {
         pending.textContent = reply;
         pending.classList.remove("coach-bubble--pending");
         pending.removeAttribute("id");
+      }
+      if (proposals && proposals.length && thread) {
+        this.state.aiProposals = this.state.aiProposals || {};
+        proposals.forEach((p) => {
+          this.state.aiProposals[p.id] = p;
+          thread.insertAdjacentHTML("beforeend", this.renderProposalCard(p, autoApply));
+          if (autoApply) this.applyAIProposal(p.id, true);
+        });
+        thread.scrollTop = thread.scrollHeight;
       }
     } catch (err) {
       const pending = document.getElementById("coach-pending");
@@ -985,6 +995,85 @@ const App = {
       if (input) { input.disabled = false; input.focus(); }
       if (sendBtn) sendBtn.disabled = false;
       if (thread) thread.scrollTop = thread.scrollHeight;
+    }
+  },
+
+  // Render kartu usulan aksi AI di dalam thread chat. Kalau autoApply true,
+  // kartu langsung tampil dalam mode "sedang dieksekusi" (tanpa tombol
+  // konfirmasi) karena applyAIProposal akan langsung dipanggil sesudahnya.
+  renderProposalCard(p, autoApply) {
+    const dayLabelsId = { monday: "Senin", tuesday: "Selasa", wednesday: "Rabu", thursday: "Kamis", friday: "Jumat", saturday: "Sabtu", sunday: "Minggu" };
+    let detailHTML = "";
+    if (p.type === "propose_schedule_change") {
+      const tpl = SCHEDULE_TEMPLATES.find((t) => t.type === p.input.template_type);
+      detailHTML = `<div class="text-body">${dayLabelsId[p.input.day] || p.input.day} → <strong>${tpl ? `${tpl.emoji} ${tpl.label}` : p.input.template_type}</strong></div>`;
+    } else if (p.type === "propose_targets_change") {
+      const rows = [];
+      if (p.input.weight_kg != null) rows.push(`Target berat: <strong>${p.input.weight_kg} kg</strong>`);
+      if (p.input.pushup_target != null) rows.push(`Target push-up KAI: <strong>${p.input.pushup_target}</strong>`);
+      if (p.input.situp_target != null) rows.push(`Target sit-up KAI: <strong>${p.input.situp_target}</strong>`);
+      detailHTML = `<div class="text-body">${rows.join("<br>") || "(tidak ada perubahan)"}</div>`;
+    } else if (p.type === "propose_notification_change") {
+      const rows = [];
+      if (p.input.notification_time) rows.push(`Jam: <strong>${UI.escapeHtml(p.input.notification_time)}</strong>`);
+      if (p.input.notification_message) rows.push(`Pesan: <strong>${UI.escapeHtml(p.input.notification_message)}</strong>`);
+      detailHTML = `<div class="text-body">${rows.join("<br>") || "(tidak ada perubahan)"}</div>`;
+    }
+    const actionsHTML = autoApply
+      ? `<div class="text-caption mt-sm">⚡ Full-Auto — dieksekusi otomatis</div>`
+      : `<div class="flex-between mt-md" style="gap:var(--space-sm)">
+          <button class="btn btn-secondary" style="width:auto" data-action="apply-ai-proposal" data-id="${p.id}">Terapkan</button>
+          <button class="btn btn-ghost" style="width:auto" data-action="reject-ai-proposal" data-id="${p.id}">Tolak</button>
+        </div>`;
+    return `
+      <div class="coach-bubble coach-bubble--proposal" id="proposal-${p.id}">
+        <div class="text-caption mb-sm">🛠️ ${UI.escapeHtml(p.label)}</div>
+        ${detailHTML}
+        ${p.input.reason ? `<div class="text-caption mt-sm">Alasan: ${UI.escapeHtml(p.input.reason)}</div>` : ""}
+        ${actionsHTML}
+      </div>`;
+  },
+
+  applyAIProposal(id, silent) {
+    const p = this.state.aiProposals && this.state.aiProposals[id];
+    const card = document.getElementById(`proposal-${id}`);
+    if (!p) return;
+
+    if (p.type === "propose_schedule_change") {
+      const tpl = SCHEDULE_TEMPLATES.find((t) => t.type === p.input.template_type);
+      if (!tpl) { if (!silent) { UI.toast("Tipe hari tidak dikenal, usulan dibatalkan."); this.rejectAIProposal(id); } return; }
+      const schedule = { ...AppData.getSchedule() };
+      schedule[p.input.day] = JSON.parse(JSON.stringify(tpl));
+      AppData.setCustomSchedule(schedule);
+      UI.toast("Jadwal diperbarui oleh AI Coach.");
+    } else if (p.type === "propose_targets_change") {
+      const targets = { ...AppData.getTargets() };
+      if (p.input.weight_kg != null) targets.weight_kg = p.input.weight_kg;
+      if (p.input.pushup_target != null) targets.pushup_target = p.input.pushup_target;
+      if (p.input.situp_target != null) targets.situp_target = p.input.situp_target;
+      AppData.setTargets(targets);
+      UI.toast("Target diperbarui oleh AI Coach.");
+    } else if (p.type === "propose_notification_change") {
+      const settings = { ...AppData.getSettings() };
+      if (p.input.notification_time) settings.notification_time = p.input.notification_time;
+      if (p.input.notification_message) settings.notification_message = p.input.notification_message;
+      AppData.setSettings(settings);
+      UI.toast("Notifikasi diperbarui oleh AI Coach.");
+    }
+
+    p.applied = true;
+    if (card) {
+      card.innerHTML = `<div class="text-caption">✅ ${UI.escapeHtml(p.label)} — diterapkan${silent ? " otomatis" : ""}.</div>`;
+      card.classList.remove("coach-bubble--proposal");
+    }
+  },
+
+  rejectAIProposal(id) {
+    const card = document.getElementById(`proposal-${id}`);
+    if (this.state.aiProposals) delete this.state.aiProposals[id];
+    if (card) {
+      card.innerHTML = `<div class="text-caption">Usulan ditolak.</div>`;
+      card.classList.remove("coach-bubble--proposal");
     }
   },
 
@@ -1088,16 +1177,30 @@ const App = {
           <select class="field-input" id="ai-provider">
             <option value="anthropic" ${aiSettings.provider === "anthropic" ? "selected" : ""}>Anthropic (Claude)</option>
             <option value="openai" ${aiSettings.provider === "openai" ? "selected" : ""}>OpenAI (ChatGPT)</option>
+            <option value="gemini" ${aiSettings.provider === "gemini" ? "selected" : ""}>Google (Gemini)</option>
           </select>
         </div>
         <div class="field">
           <label class="field-label" for="ai-model">Model</label>
-          <input class="field-input" id="ai-model" value="${UI.escapeHtml(aiSettings.model)}" placeholder="mis. claude-sonnet-5 atau gpt-4o-mini" />
+          <div class="flex-between" style="gap:var(--space-sm)">
+            <input class="field-input" id="ai-model" list="ai-model-list" value="${UI.escapeHtml(aiSettings.model)}" placeholder="mis. claude-sonnet-5, gpt-4o-mini, gemini-2.5-flash" />
+            <button type="button" class="btn btn-ghost" style="width:auto;white-space:nowrap" data-action="load-ai-models">Muat Model</button>
+          </div>
+          <datalist id="ai-model-list"></datalist>
+          <p class="text-caption mt-sm" id="ai-model-status"></p>
         </div>
         <div class="field">
           <label class="field-label" for="ai-key">API Key</label>
-          <input class="field-input" id="ai-key" type="password" value="${UI.escapeHtml(aiSettings.apiKey)}" placeholder="sk-ant-... atau sk-..." autocomplete="off" />
+          <input class="field-input" id="ai-key" type="password" value="${UI.escapeHtml(aiSettings.apiKey)}" placeholder="sk-ant-... / sk-... / AIza..." autocomplete="off" />
         </div>
+        <p class="text-caption mb-sm">AI Coach bisa mengusulkan perubahan jadwal/target/notifikasi langsung dari chat.</p>
+        <div class="toggle-row">
+          <span class="text-body">Auto-Terapkan (Full-Auto)</span>
+          <button class="toggle-switch ${aiSettings.autoApply ? "is-on" : ""}" data-action="toggle-ai-autoapply" aria-pressed="${aiSettings.autoApply}" aria-label="Auto-terapkan usulan AI Coach"></button>
+        </div>
+        <p class="text-caption mb-sm">${aiSettings.autoApply
+          ? "⚠️ AKTIF: AI langsung mengeksekusi perubahan jadwal/target/notifikasi begitu ia memutuskan itu perlu, berdasarkan perbandingan progress vs target — TANPA konfirmasi kamu dulu. Setiap perubahan tetap tercatat di chat supaya bisa kamu cek/undo manual."
+          : "Nonaktif: tiap usulan AI muncul sebagai kartu di chat dengan tombol Terapkan/Tolak, kamu yang putuskan."}</p>
         <button class="btn btn-secondary mb-sm" data-action="save-ai-settings">SIMPAN AI COACH</button>
         <button class="btn btn-ghost" data-action="test-ai-connection">Test Koneksi</button>
       </div>
@@ -1354,6 +1457,22 @@ const App = {
     this.renderSettings();
   },
 
+  async loadAIModels() {
+    const provider = document.getElementById("ai-provider")?.value || "anthropic";
+    const apiKey = document.getElementById("ai-key")?.value.trim();
+    const status = document.getElementById("ai-model-status");
+    const datalist = document.getElementById("ai-model-list");
+    if (!apiKey) { UI.toast("Isi API key dulu."); return; }
+    if (status) status.textContent = "Memuat daftar model...";
+    try {
+      const models = await AICoach.fetchModels(provider, apiKey);
+      if (datalist) datalist.innerHTML = models.map((m) => `<option value="${UI.escapeHtml(m)}"></option>`).join("");
+      if (status) status.textContent = models.length ? `${models.length} model ditemukan — pilih dari saran di field Model.` : "Tidak ada model ditemukan.";
+    } catch (err) {
+      if (status) status.textContent = `⚠️ ${err.message}`;
+    }
+  },
+
   toggleAICoach() {
     const aiSettings = AppData.getAISettings();
     if (!aiSettings.enabled && !aiSettings.apiKey) {
@@ -1361,6 +1480,12 @@ const App = {
       return;
     }
     AppData.setAISettings({ enabled: !aiSettings.enabled });
+    this.renderSettings();
+  },
+
+  toggleAIAutoApply() {
+    const aiSettings = AppData.getAISettings();
+    AppData.setAISettings({ autoApply: !aiSettings.autoApply });
     this.renderSettings();
   },
 
@@ -1507,7 +1632,11 @@ const App = {
       case "toggle-pmo": this.togglePmo(); break;
       case "save-ai-settings": this.saveAISettings(); break;
       case "toggle-ai-coach": this.toggleAICoach(); break;
+      case "toggle-ai-autoapply": this.toggleAIAutoApply(); break;
       case "test-ai-connection": this.testAIConnection(); break;
+      case "load-ai-models": this.loadAIModels(); break;
+      case "apply-ai-proposal": this.applyAIProposal(btn.dataset.id); break;
+      case "reject-ai-proposal": this.rejectAIProposal(btn.dataset.id); break;
       case "clear-coach-history": this.clearCoachHistory(); break;
       case "reset-pmo": this.resetPmo(); break;
       case "confirm-reset-pmo": this.confirmResetPmo(); break;

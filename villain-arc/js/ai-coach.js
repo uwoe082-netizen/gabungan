@@ -12,6 +12,58 @@
 // disembunyikan).
 // ============================================================
 
+// ------------------------------------------------------------
+// AGENTIC ACTIONS — daftar "tool" yang boleh diusulkan AI Coach.
+// PENTING: AI TIDAK PERNAH langsung menulis ke storage. Setiap tool call
+// yang balik dari API cuma jadi PROPOSAL (lihat App.applyAIProposal di
+// app.js) yang wajib di-review & di-"Terapkan" manual oleh user lewat
+// tombol di chat. Ini pilihan desain sadar: kasih AI kuasa reorganisasi
+// jadwal/target/notifikasi TANPA membuatnya bisa mengubah data user secara
+// diam-diam hanya karena API mengembalikan tool_use — user tetap yang
+// pegang kendali terakhir atas datanya sendiri.
+const AI_TOOL_DEFS = [
+  {
+    name: "propose_schedule_change",
+    description: "Usulkan mengubah jenis latihan pada satu hari dalam seminggu (mis. ganti Selasa dari REST jadi PUSH). Tidak langsung diterapkan — hanya jadi usulan yang harus disetujui user.",
+    parameters: {
+      type: "object",
+      properties: {
+        day: { type: "string", enum: DAY_KEYS, description: "Hari yang diubah" },
+        template_type: { type: "string", enum: [...new Set(SCHEDULE_TEMPLATES.map((t) => t.type))], description: "Tipe hari baru, ambil dari template yang sudah ada" },
+        reason: { type: "string", description: "Alasan singkat berbasis data user" }
+      },
+      required: ["day", "template_type", "reason"]
+    }
+  },
+  {
+    name: "propose_targets_change",
+    description: "Usulkan mengubah target berat badan dan/atau target reps KAI (push-up/sit-up). Field yang tidak diubah boleh dikosongkan/null.",
+    parameters: {
+      type: "object",
+      properties: {
+        weight_kg: { type: ["number", "null"], description: "Target berat badan baru (kg), null jika tidak diubah" },
+        pushup_target: { type: ["number", "null"], description: "Target push-up KAI baru, null jika tidak diubah" },
+        situp_target: { type: ["number", "null"], description: "Target sit-up KAI baru, null jika tidak diubah" },
+        reason: { type: "string", description: "Alasan singkat berbasis data user" }
+      },
+      required: ["reason"]
+    }
+  },
+  {
+    name: "propose_notification_change",
+    description: "Usulkan mengubah jam pengingat harian dan/atau isi pesan notifikasi.",
+    parameters: {
+      type: "object",
+      properties: {
+        notification_time: { type: "string", description: "Format HH:MM 24 jam, kosongkan jika tidak diubah" },
+        notification_message: { type: "string", description: "Pesan notifikasi baru, kosongkan jika tidak diubah" },
+        reason: { type: "string", description: "Alasan singkat berbasis data user" }
+      },
+      required: ["reason"]
+    }
+  }
+];
+
 const AICoach = {
   MAX_HISTORY_STORED: 40, // jumlah pesan (user+assistant) yang disimpan di localStorage
   MAX_HISTORY_SENT: 12,   // jumlah pesan terakhir yang dikirim sebagai konteks ke API tiap request
@@ -74,11 +126,29 @@ const AICoach = {
     ].filter(Boolean).join("\n");
   },
 
-  systemPrompt(context) {
-    return `Kamu adalah "COACH" — pelatih pribadi di dalam aplikasi VILLAIN ARC, fitness tracker RPG bertema dark-villain. Nada bicaramu tajam, provokatif, tanpa basa-basi ala villain anime, TAPI selalu jujur dan berbasis data nyata pengguna — jangan cuma motivasi kosong. Jawab dalam Bahasa Indonesia, ringkas (idealnya di bawah 150 kata kecuali diminta detail), dan actionable — kasih langkah konkret, bukan cuma semangat-semangatan. Kalau data menunjukkan pola buruk (sering skip, target ketinggalan, dst), tegur dengan tegas tapi tetap membangun. Kamu TIDAK bisa mengubah data aplikasi (jadwal, XP, dsb) secara langsung — kalau user minta perubahan konkret, arahkan mereka ke halaman/tombol yang tepat di app (mis. "Command Center > Edit Jadwal").
+  systemPrompt(context, autoApply) {
+    const autonomyClause = autoApply
+      ? `Mode kamu sekarang FULL-AUTO: setiap tool call yang kamu panggil akan LANGSUNG diterapkan ke data user tanpa konfirmasi manual. Karena itu, WAJIB: (1) bandingkan dulu progress aktual user (14 hari terakhir, PR, streak) terhadap target/tujuan mereka sebelum memutuskan berubah apa, (2) hanya panggil tool kalau perbandingan itu benar-benar menunjukkan penyesuaian diperlukan (bukan asal-asalan tiap chat), (3) di teks balasanmu, jelaskan SINGKAT data mana yang jadi dasar keputusan (mis. "3 dari 4 minggu terakhir hari Rabu di-skip, jadi saya turunkan intensitas Rabu"), (4) jangan mengubah hal yang sama berkali-kali dalam waktu berdekatan tanpa data baru yang mendukung.`
+      : `Kamu punya tools untuk MENGUSULKAN perubahan konkret ke jadwal/target/notifikasi user. Tool call itu TIDAK langsung mengubah data — akan ditampilkan ke user sebagai usulan yang harus mereka setujui manual (tombol Terapkan/Tolak di chat). Panggil tool kalau user secara eksplisit minta perubahan, atau kalau kamu lihat pola data yang jelas butuh penyesuaian dan mau mengusulkannya proaktif.`;
+
+    return `Kamu adalah "COACH" — pelatih pribadi di dalam aplikasi VILLAIN ARC, fitness tracker RPG bertema dark-villain. Nada bicaramu tajam, provokatif, tanpa basa-basi ala villain anime, TAPI selalu jujur dan berbasis data nyata pengguna — jangan cuma motivasi kosong. Jawab dalam Bahasa Indonesia, ringkas (idealnya di bawah 150 kata kecuali diminta detail), dan actionable — kasih langkah konkret, bukan cuma semangat-semangatan. Kalau data menunjukkan pola buruk (sering skip, target ketinggalan, dst), tegur dengan tegas tapi tetap membangun.
+
+Setiap kali mempertimbangkan perubahan, selalu bandingkan progress AKTUAL user (lihat "14 hari terakhir", personal record, streak, di bawah) terhadap TARGET/TUJUAN yang mereka set (target berat, target push-up/sit-up KAI). Contoh penalaran: kalau push-up KAI user masih jauh di bawah target dan tren PR stagnan, itu alasan valid buat naikkan volume/adjust jadwal — bukan sekadar tebakan.
+
+${autonomyClause} Selalu sertakan field "reason" yang jujur dan berbasis data spesifik di atas tiap tool call.
 
 DATA PENGGUNA SAAT INI:
 ${context}`;
+  },
+
+  /** Ambil hanya field berguna dari tool input jadi objek proposal siap-tampil. */
+  _normalizeProposal(name, input) {
+    const labels = {
+      propose_schedule_change: "Usulan Ubah Jadwal",
+      propose_targets_change: "Usulan Ubah Target",
+      propose_notification_change: "Usulan Ubah Notifikasi"
+    };
+    return { id: `${name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type: name, label: labels[name] || name, input, applied: false };
   },
 
   async sendMessage(userText) {
@@ -90,19 +160,21 @@ ${context}`;
     history.push({ role: "user", content: userText, ts: Date.now() });
 
     const context = await this.buildContextSummary();
-    const system = this.systemPrompt(context);
+    const system = this.systemPrompt(context, !!settings.autoApply);
     const recent = history.slice(-this.MAX_HISTORY_SENT);
 
-    const replyText = settings.provider === "openai"
-      ? await this._callOpenAI(settings, system, recent)
-      : await this._callAnthropic(settings, system, recent);
+    let result;
+    if (settings.provider === "openai") result = await this._callOpenAI(settings, system, recent);
+    else if (settings.provider === "gemini") result = await this._callGemini(settings, system, recent);
+    else result = await this._callAnthropic(settings, system, recent);
 
+    const replyText = result.text || (result.proposals.length ? "(Coach mengusulkan perubahan berikut — review & terapkan kalau setuju.)" : "(tidak ada respons teks)");
     history.push({ role: "assistant", content: replyText, ts: Date.now() });
     AppData.setAIChatHistory(history.slice(-this.MAX_HISTORY_STORED));
-    return replyText;
+    return { text: replyText, proposals: result.proposals, autoApply: !!settings.autoApply };
   },
 
-  async _callAnthropic(settings, systemPrompt, history) {
+  async _callAnthropic(settings, systemPrompt, history, useTools = true) {
     let res;
     try {
       res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -119,7 +191,8 @@ ${context}`;
           model: settings.model || "claude-sonnet-5",
           max_tokens: 1024,
           system: systemPrompt,
-          messages: history.map((m) => ({ role: m.role, content: m.content }))
+          messages: history.map((m) => ({ role: m.role, content: m.content })),
+          ...(useTools ? { tools: AI_TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) } : {})
         })
       });
     } catch (e) {
@@ -130,11 +203,13 @@ ${context}`;
       throw new Error(body?.error?.message || `Anthropic API error (HTTP ${res.status})`);
     }
     const data = await res.json();
-    const textBlock = (data.content || []).find((b) => b.type === "text");
-    return textBlock ? textBlock.text : "(tidak ada respons teks)";
+    const blocks = data.content || [];
+    const text = blocks.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+    const proposals = blocks.filter((b) => b.type === "tool_use").map((b) => this._normalizeProposal(b.name, b.input));
+    return { text, proposals };
   },
 
-  async _callOpenAI(settings, systemPrompt, history) {
+  async _callOpenAI(settings, systemPrompt, history, useTools = true) {
     let res;
     try {
       res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -145,7 +220,8 @@ ${context}`;
         },
         body: JSON.stringify({
           model: settings.model || "gpt-4o-mini",
-          messages: [{ role: "system", content: systemPrompt }, ...history.map((m) => ({ role: m.role, content: m.content }))]
+          messages: [{ role: "system", content: systemPrompt }, ...history.map((m) => ({ role: m.role, content: m.content }))],
+          ...(useTools ? { tools: AI_TOOL_DEFS.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })) } : {})
         })
       });
     } catch (e) {
@@ -156,14 +232,79 @@ ${context}`;
       throw new Error(body?.error?.message || `OpenAI API error (HTTP ${res.status})`);
     }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || "(tidak ada respons teks)";
+    const msg = data.choices?.[0]?.message || {};
+    const text = (msg.content || "").trim();
+    const proposals = (msg.tool_calls || []).map((tc) => {
+      let input = {};
+      try { input = JSON.parse(tc.function.arguments || "{}"); } catch (e) { /* ignore malformed args */ }
+      return this._normalizeProposal(tc.function.name, input);
+    });
+    return { text, proposals };
+  },
+
+  async _callGemini(settings, systemPrompt, history, useTools = true) {
+    const model = settings.model || "gemini-2.5-flash";
+    let res;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(settings.apiKey)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: history.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+          ...(useTools ? { tools: [{ functionDeclarations: AI_TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) }] } : {})
+        })
+      });
+    } catch (e) {
+      throw new Error("Gagal menghubungi Gemini API. Cek koneksi internet.");
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error?.message || `Gemini API error (HTTP ${res.status})`);
+    }
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const text = parts.filter((p) => p.text).map((p) => p.text).join("\n").trim();
+    const proposals = parts.filter((p) => p.functionCall).map((p) => this._normalizeProposal(p.functionCall.name, p.functionCall.args || {}));
+    return { text, proposals };
   },
 
   /** Panggilan super ringan buat validasi API key di tombol "Test Koneksi". */
   async testConnection(settings) {
     const probe = [{ role: "user", content: "Balas dengan tepat satu kata: OK" }];
-    return settings.provider === "openai"
-      ? this._callOpenAI(settings, "Kamu asisten uji koneksi. Ikuti instruksi user persis.", probe)
-      : this._callAnthropic(settings, "Kamu asisten uji koneksi. Ikuti instruksi user persis.", probe);
+    const sys = "Kamu asisten uji koneksi. Ikuti instruksi user persis.";
+    if (settings.provider === "openai") return (await this._callOpenAI(settings, sys, probe, false)).text;
+    if (settings.provider === "gemini") return (await this._callGemini(settings, sys, probe, false)).text;
+    return (await this._callAnthropic(settings, sys, probe, false)).text;
+  },
+
+  /** Ambil daftar model dari provider (dipakai buat isi datalist "Model" di Command Center). */
+  async fetchModels(provider, apiKey) {
+    if (!apiKey) throw new Error("Isi API key dulu.");
+    if (provider === "openai") {
+      const res = await fetch("https://api.openai.com/v1/models", { headers: { "Authorization": `Bearer ${apiKey}` } });
+      if (!res.ok) throw new Error(`OpenAI API error (HTTP ${res.status})`);
+      const data = await res.json();
+      return (data.data || [])
+        .map((m) => m.id)
+        .filter((id) => /^(gpt-|o[1-9])/.test(id))
+        .sort();
+    }
+    if (provider === "gemini") {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+      if (!res.ok) throw new Error(`Gemini API error (HTTP ${res.status})`);
+      const data = await res.json();
+      return (data.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+        .map((m) => m.name.replace(/^models\//, ""))
+        .sort();
+    }
+    // anthropic
+    const res = await fetch("https://api.anthropic.com/v1/models", {
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }
+    });
+    if (!res.ok) throw new Error(`Anthropic API error (HTTP ${res.status})`);
+    const data = await res.json();
+    return (data.data || []).map((m) => m.id).sort();
   }
 };
