@@ -34,7 +34,7 @@
   /* === TEXT HIERARCHY === */
   --text-primary:   #f4f4f5;
   --text-secondary: #a1a1aa;
-  --text-muted:     #52525b;
+  --text-muted:     #87878f; /* dulu #52525b — rasio kontras cuma ~2.2-2.6:1 (gagal WCAG AA di semua background gelap yang dipakai app ini). Sekarang >=4.5:1 di ketiganya. */
   --text-accent:    var(--crimson-400);
 
   /* === BORDERS & DIVIDERS === */

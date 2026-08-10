@@ -106,7 +106,9 @@ class ProgressiveReveal {
 
   getSummary() {
     const p = this.getProgress();
-    const correct = p.total - p.errors;
+    // Kata yang dibantu hint tidak dihitung "benar" murni — supaya skor tetap jujur
+    // dan tidak sama dengan kata yang benar-benar berhasil dibaca sendiri.
+    const correct = p.total - p.errors - p.hints;
     const accuracy = p.total ? Math.round((correct / p.total) * 100) : 0;
     return { ...p, accuracy };
   }

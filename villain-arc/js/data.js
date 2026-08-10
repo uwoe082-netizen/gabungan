@@ -41,6 +41,14 @@ const WORKOUT_SCHEDULE_DEFAULT = {
 };
 
 const DAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+// Daftar unik template hari (dipakai fitur "Edit Jadwal" di Command Center) —
+// diturunkan dari WORKOUT_SCHEDULE_DEFAULT, satu entri per `type` unik
+// (PUSH, REST, PULL_CORE, LEGS, HEARTBREAK). User memilih tipe hari untuk
+// tiap hari-dalam-minggu; isi exercise-nya ikut template yang dipilih.
+const SCHEDULE_TEMPLATES = Object.values(WORKOUT_SCHEDULE_DEFAULT).filter(
+  (day, i, arr) => arr.findIndex((d) => d.type === day.type) === i
+);
 const DAY_LABELS_ID = ["MINGGU", "SENIN", "SELASA", "RABU", "KAMIS", "JUMAT", "SABTU"];
 const MONTH_LABELS_ID = ["JANUARI","FEBRUARI","MARET","APRIL","MEI","JUNI","JULI","AGUSTUS","SEPTEMBER","OKTOBER","NOVEMBER","DESEMBER"];
 

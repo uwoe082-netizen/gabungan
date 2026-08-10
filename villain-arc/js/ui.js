@@ -11,6 +11,12 @@ const UI = {
       el = document.createElement("div");
       el.id = "toast";
       el.className = "toast";
+      // aria-live="polite" supaya screen reader mengumumkan pesan toast
+      // (XP dapat, achievement unlock, dll) tanpa menyita fokus pengguna —
+      // sebelumnya toast murni visual, sama sekali tidak terdeteksi screen reader.
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
+      el.setAttribute("aria-atomic", "true");
       document.body.appendChild(el);
     }
     el.textContent = message;
@@ -78,14 +84,52 @@ const UI = {
       overlay.addEventListener("click", (e) => {
         if (e.target === overlay) UI.closeModal();
       });
+      // ESC untuk tutup modal, dan Tab di-trap sederhana supaya fokus tidak
+      // "bocor" ke elemen di belakang overlay (halaman utama) selama modal
+      // terbuka — dua celah aksesibilitas yang sebelumnya tidak ada sama sekali.
+      document.addEventListener("keydown", (e) => {
+        if (!overlay.classList.contains("is-open")) return;
+        if (e.key === "Escape") {
+          UI.closeModal();
+          return;
+        }
+        if (e.key === "Tab") {
+          const focusable = overlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      });
     }
-    overlay.innerHTML = `<div class="modal-sheet">${contentHTML}</div>`;
-    requestAnimationFrame(() => overlay.classList.add("is-open"));
+    this._lastFocused = document.activeElement;
+    overlay.innerHTML = `<div class="modal-sheet" role="dialog" aria-modal="true">${contentHTML}</div>`;
+    requestAnimationFrame(() => {
+      overlay.classList.add("is-open");
+      const sheet = overlay.querySelector(".modal-sheet");
+      // Pindahkan fokus ke elemen fokusable pertama di dalam modal (input kalau
+      // ada, kalau tidak ke sheet-nya sendiri) supaya pengguna keyboard/screen
+      // reader tahu fokus sudah berpindah ke dialog, bukan tertinggal di halaman.
+      const firstFocusable = sheet?.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (firstFocusable) firstFocusable.focus();
+      else if (sheet) { sheet.setAttribute("tabindex", "-1"); sheet.focus(); }
+    });
   },
 
   closeModal() {
     const overlay = document.getElementById("modal-overlay");
     if (overlay) overlay.classList.remove("is-open");
+    // Kembalikan fokus ke elemen yang tadi memicu modal (tombol yang diklik),
+    // bukan dibiarkan hilang ke <body> — praktik standar untuk dialog aksesibel.
+    if (this._lastFocused && typeof this._lastFocused.focus === "function") {
+      this._lastFocused.focus();
+    }
   },
 
   formatNumber(n) {

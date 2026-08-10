@@ -7,7 +7,9 @@ const App = {
     onboardingStep: 1,
     onboardingData: { codename: "", weight_kg: "", pushup_target: "", situp_target: "" },
     activeTimerExercise: null,
-    restTimerActive: false
+    restTimerActive: false,
+    exerciseEditDay: null,
+    exerciseEditList: []
   },
 
   async init() {
@@ -44,6 +46,7 @@ const App = {
       case "dashboard": this.renderDashboard(); break;
       case "progress": this.renderProgress(); break;
       case "achievements": this.renderAchievements(); break;
+      case "coach": this.renderCoach(); break;
       case "settings": this.renderSettings(); break;
       default: this.renderDashboard();
     }
@@ -61,21 +64,24 @@ const App = {
         <div class="logo">VILLAIN ARC</div>
         <div class="topbar-actions">
           <div class="streak-badge">🔥 <span>${streak}</span></div>
-          <a href="#/settings" class="icon-btn" aria-label="Settings">⚙️</a>
+          <a href="#/settings" class="icon-btn" aria-label="Pengaturan">⚙️</a>
         </div>
       </header>
       <main id="page-content" class="page page-transition"></main>
       <nav class="bottom-nav">
-        <a href="#/dashboard" class="nav-tab ${active === "dashboard" ? "is-active" : ""}">
+        <a href="#/dashboard" class="nav-tab ${active === "dashboard" ? "is-active" : ""}" ${active === "dashboard" ? 'aria-current="page"' : ""}>
           <span class="nav-tab-icon">🏠</span><span class="nav-tab-label">War Room</span>
         </a>
-        <a href="#/progress" class="nav-tab ${active === "progress" ? "is-active" : ""}">
+        <a href="#/progress" class="nav-tab ${active === "progress" ? "is-active" : ""}" ${active === "progress" ? 'aria-current="page"' : ""}>
           <span class="nav-tab-icon">📊</span><span class="nav-tab-label">War Journal</span>
         </a>
-        <a href="#/achievements" class="nav-tab ${active === "achievements" ? "is-active" : ""}">
+        <a href="#/achievements" class="nav-tab ${active === "achievements" ? "is-active" : ""}" ${active === "achievements" ? 'aria-current="page"' : ""}>
           <span class="nav-tab-icon">🏆</span><span class="nav-tab-label">Hall of Shadows</span>
         </a>
-        <a href="#/settings" class="nav-tab ${active === "settings" ? "is-active" : ""}">
+        <a href="#/coach" class="nav-tab ${active === "coach" ? "is-active" : ""}" ${active === "coach" ? 'aria-current="page"' : ""}>
+          <span class="nav-tab-icon">🧠</span><span class="nav-tab-label">AI Coach</span>
+        </a>
+        <a href="#/settings" class="nav-tab ${active === "settings" ? "is-active" : ""}" ${active === "settings" ? 'aria-current="page"' : ""}>
           <span class="nav-tab-icon">⚙️</span><span class="nav-tab-label">Command Center</span>
         </a>
       </nav>
@@ -105,7 +111,7 @@ const App = {
       body = `
         <h1 class="onboarding-title">Pilih codename-mu, pejuang.</h1>
         <div class="field mt-lg">
-          <input class="field-input" id="ob-codename" placeholder="SHADOW" value="${UI.escapeHtml(this.state.onboardingData.codename)}" maxlength="20" />
+          <input class="field-input" id="ob-codename" aria-label="Codename" placeholder="SHADOW" value="${UI.escapeHtml(this.state.onboardingData.codename)}" maxlength="20" />
         </div>
         <div class="onboarding-actions">
           <button class="btn btn-primary" data-action="onboard-next">LANJUT →</button>
@@ -114,15 +120,15 @@ const App = {
       body = `
         <h1 class="onboarding-title">Kunci targetmu.</h1>
         <div class="field mt-lg">
-          <label class="field-label">Target berat badan (kg)</label>
+          <label class="field-label" for="ob-weight">Target berat badan (kg)</label>
           <input class="field-input" id="ob-weight" type="number" inputmode="decimal" placeholder="70" value="${UI.escapeHtml(this.state.onboardingData.weight_kg)}" />
         </div>
         <div class="field">
-          <label class="field-label">Target push-up per menit (KAI)</label>
+          <label class="field-label" for="ob-pushup">Target push-up per menit (KAI)</label>
           <input class="field-input" id="ob-pushup" type="number" inputmode="numeric" placeholder="40" value="${UI.escapeHtml(this.state.onboardingData.pushup_target)}" />
         </div>
         <div class="field">
-          <label class="field-label">Target sit-up per menit (KAI)</label>
+          <label class="field-label" for="ob-situp">Target sit-up per menit (KAI)</label>
           <input class="field-input" id="ob-situp" type="number" inputmode="numeric" placeholder="40" value="${UI.escapeHtml(this.state.onboardingData.situp_target)}" />
         </div>
         <div class="onboarding-actions">
@@ -240,7 +246,7 @@ const App = {
         const done = checkedIds.has(ex.id);
         return `
         <div class="checklist-item ${done ? "is-complete" : ""}" data-exercise-id="${ex.id}">
-          <button class="checkbox-diamond" data-action="toggle-exercise" data-id="${ex.id}" aria-label="Tandai ${UI.escapeHtml(ex.name)}">
+          <button class="checkbox-diamond" data-action="toggle-exercise" data-id="${ex.id}" aria-label="Tandai ${UI.escapeHtml(ex.name)}" aria-pressed="${done}">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
           </button>
           <div class="exercise-info">
@@ -645,7 +651,7 @@ const App = {
         <div class="modal-handle"></div>
         <h3 class="heading-m mb-md">${UI.escapeHtml(exerciseName)}</h3>
         <div class="field">
-          <label class="field-label">Jumlah reps yang dicapai</label>
+          <label class="field-label" for="reps-input">Jumlah reps yang dicapai</label>
           <input type="number" inputmode="numeric" class="field-input" id="reps-input" autofocus placeholder="0" />
         </div>
         <button class="btn btn-primary" id="reps-submit">SIMPAN</button>
@@ -775,8 +781,11 @@ const App = {
     const situpPath = points.map((p, i) => toXY(i, p.situp_count || 0)).map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ");
     const targetY = h - pad - ((targets.pushup_target || 0) / maxVal) * (h - pad * 2);
 
+    const latest = points[points.length - 1];
+    const chartSummary = `Grafik tren tes KAI, ${points.length} sesi terakhir. Push-up terakhir: ${latest.pushup_count ?? 0}, target ${targets.pushup_target || 0}. Sit-up terakhir: ${latest.situp_count ?? 0}, target ${targets.situp_target || 0}.`;
+
     return `
-      <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" preserveAspectRatio="xMidYMid meet">
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${UI.escapeHtml(chartSummary)}">
         <line x1="${pad}" y1="${targetY}" x2="${w - pad}" y2="${targetY}" stroke="var(--text-muted)" stroke-dasharray="4 4" stroke-width="1"/>
         <path d="${pushupPath}" fill="none" stroke="var(--crimson-500)" stroke-width="2"/>
         <path d="${situpPath}" fill="none" stroke="var(--purple-500)" stroke-width="2"/>
@@ -803,15 +812,15 @@ const App = {
       <div class="modal-handle"></div>
       <h3 class="heading-m mb-md">Catat Body Stats</h3>
       <div class="field">
-        <label class="field-label">Berat badan (kg)</label>
+        <label class="field-label" for="bs-weight">Berat badan (kg)</label>
         <input type="number" inputmode="decimal" class="field-input" id="bs-weight" />
       </div>
       <div class="field">
-        <label class="field-label">Lingkar dada (cm)</label>
+        <label class="field-label" for="bs-chest">Lingkar dada (cm)</label>
         <input type="number" inputmode="decimal" class="field-input" id="bs-chest" />
       </div>
       <div class="field">
-        <label class="field-label">Lingkar lengan (cm)</label>
+        <label class="field-label" for="bs-arm">Lingkar lengan (cm)</label>
         <input type="number" inputmode="decimal" class="field-input" id="bs-arm" />
       </div>
       <button class="btn btn-primary" data-action="save-body-stats">SIMPAN</button>
@@ -855,7 +864,7 @@ const App = {
     const badgesHTML = ACHIEVEMENTS.map((a) => {
       const unlocked = unlockedIds.has(a.id);
       return `
-        <button class="badge-tile ${unlocked ? "is-unlocked" : "is-locked"}" data-action="badge-detail" data-id="${a.id}">
+        <button class="badge-tile ${unlocked ? "is-unlocked" : "is-locked"}" data-action="badge-detail" data-id="${a.id}" aria-label="${unlocked ? `Achievement terbuka: ${a.name}` : `Achievement terkunci: ${a.name}`}">
           <div class="badge-icon">${unlocked ? a.icon : "🔒"}</div>
           <div class="badge-name">${a.name}</div>
         </button>`;
@@ -893,6 +902,99 @@ const App = {
   },
 
   // ============================================================
+  // AI COACH
+  // ============================================================
+  renderCoach() {
+    const settings = AppData.getAISettings();
+    const history = AppData.getAIChatHistory();
+
+    if (!settings.enabled || !settings.apiKey) {
+      this.pageEl().innerHTML = `
+        <h1 class="heading-l mb-md">AI Coach</h1>
+        <div class="coach-empty">
+          <div class="coach-empty-icon">🧠</div>
+          <p class="text-body mb-md">Belum aktif. Sambungkan API key milikmu sendiri (Anthropic Claude atau OpenAI) di Command Center untuk konsultasi soal jadwal, progress, dan strategi — semua jawaban digroundkan ke data asli kamu di app ini, bukan generik.</p>
+          <a href="#/settings" class="btn btn-secondary" style="width:auto;display:inline-flex">Setup di Command Center</a>
+        </div>
+      `;
+      return;
+    }
+
+    const bubblesHTML = history.length
+      ? history.map((m) => `<div class="coach-bubble coach-bubble--${m.role}">${UI.escapeHtml(m.content)}</div>`).join("")
+      : `<div class="coach-bubble coach-bubble--assistant">Ceritain progress-mu, atau tanya apa saja soal jadwal dan strategi latihan. Aku baca dulu data kamu di app ini sebelum jawab.</div>`;
+
+    this.pageEl().innerHTML = `
+      <h1 class="heading-l mb-md">AI Coach</h1>
+      <div class="coach-thread" id="coach-thread">${bubblesHTML}</div>
+      <form id="coach-form" class="coach-input-row">
+        <label class="sr-only" for="coach-input">Pesan untuk AI Coach</label>
+        <input class="field-input" id="coach-input" placeholder="Tanya soal jadwal, progress, strategi..." autocomplete="off" />
+        <button type="submit" class="btn btn-secondary" style="width:auto" id="coach-send">Kirim</button>
+      </form>
+      <button class="btn btn-ghost mt-sm" data-action="clear-coach-history" style="width:auto">Hapus riwayat obrolan</button>
+    `;
+
+    const thread = document.getElementById("coach-thread");
+    if (thread) thread.scrollTop = thread.scrollHeight;
+
+    const form = document.getElementById("coach-form");
+    if (form) {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        this.sendCoachMessage();
+      });
+    }
+  },
+
+  async sendCoachMessage() {
+    const input = document.getElementById("coach-input");
+    const sendBtn = document.getElementById("coach-send");
+    const thread = document.getElementById("coach-thread");
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = "";
+    input.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
+
+    if (thread) {
+      thread.insertAdjacentHTML("beforeend", `<div class="coach-bubble coach-bubble--user">${UI.escapeHtml(text)}</div>`);
+      thread.insertAdjacentHTML("beforeend", `<div class="coach-bubble coach-bubble--assistant coach-bubble--pending" id="coach-pending">Coach lagi mikir...</div>`);
+      thread.scrollTop = thread.scrollHeight;
+    }
+
+    try {
+      const reply = await AICoach.sendMessage(text);
+      const pending = document.getElementById("coach-pending");
+      if (pending) {
+        pending.textContent = reply;
+        pending.classList.remove("coach-bubble--pending");
+        pending.removeAttribute("id");
+      }
+    } catch (err) {
+      const pending = document.getElementById("coach-pending");
+      if (pending) {
+        pending.textContent = `⚠️ ${err.message}`;
+        pending.classList.remove("coach-bubble--pending");
+        pending.classList.add("coach-bubble--error");
+        pending.removeAttribute("id");
+      }
+    } finally {
+      if (input) { input.disabled = false; input.focus(); }
+      if (sendBtn) sendBtn.disabled = false;
+      if (thread) thread.scrollTop = thread.scrollHeight;
+    }
+  },
+
+  clearCoachHistory() {
+    AppData.clearAIChatHistory();
+    UI.toast("Riwayat obrolan dihapus.");
+    this.renderCoach();
+  },
+
+  // ============================================================
   // SETTINGS ("Command Center")
   // ============================================================
   renderSettings() {
@@ -900,6 +1002,7 @@ const App = {
     const targets = AppData.getTargets();
     const settings = AppData.getSettings();
     const schedule = AppData.getSchedule();
+    const aiSettings = AppData.getAISettings();
 
     const presetsHTML = NOTIFICATION_PRESETS.map((p) => `
       <button class="preset-msg ${settings.notification_message === p ? "is-selected" : ""}" data-action="select-preset" data-msg="${UI.escapeHtml(p)}">${UI.escapeHtml(p)}</button>
@@ -921,19 +1024,19 @@ const App = {
       <div class="settings-section">
         <div class="settings-section-title">Profile</div>
         <div class="field">
-          <label class="field-label">Codename</label>
+          <label class="field-label" for="set-codename">Codename</label>
           <input class="field-input" id="set-codename" value="${UI.escapeHtml(codename)}" maxlength="20" />
         </div>
         <div class="field">
-          <label class="field-label">Target berat badan (kg)</label>
+          <label class="field-label" for="set-weight">Target berat badan (kg)</label>
           <input class="field-input" id="set-weight" type="number" value="${targets.weight_kg ?? ""}" />
         </div>
         <div class="field">
-          <label class="field-label">Target push-up KAI</label>
+          <label class="field-label" for="set-pushup">Target push-up KAI</label>
           <input class="field-input" id="set-pushup" type="number" value="${targets.pushup_target ?? ""}" />
         </div>
         <div class="field">
-          <label class="field-label">Target sit-up KAI</label>
+          <label class="field-label" for="set-situp">Target sit-up KAI</label>
           <input class="field-input" id="set-situp" type="number" value="${targets.situp_target ?? ""}" />
         </div>
         <button class="btn btn-secondary" data-action="save-profile">SIMPAN PROFILE</button>
@@ -943,10 +1046,10 @@ const App = {
         <div class="settings-section-title">Notifikasi</div>
         <div class="toggle-row">
           <span class="text-body">Push Notification</span>
-          <button class="toggle-switch ${settings.notification_enabled ? "is-on" : ""}" data-action="toggle-notif"></button>
+          <button class="toggle-switch ${settings.notification_enabled ? "is-on" : ""}" data-action="toggle-notif" aria-pressed="${settings.notification_enabled}" aria-label="Aktifkan push notification"></button>
         </div>
         <div class="field mt-md">
-          <label class="field-label">Jam notifikasi</label>
+          <label class="field-label" for="set-notif-time">Jam notifikasi</label>
           <input class="field-input" id="set-notif-time" type="time" value="${settings.notification_time}" />
         </div>
         <label class="field-label mt-md">Pesan Preset</label>
@@ -958,7 +1061,7 @@ const App = {
         <div class="settings-section-title">Anti-PMO Tracker</div>
         <div class="toggle-row">
           <span class="text-body">Aktifkan Tracker</span>
-          <button class="toggle-switch ${settings.pmo_tracker_enabled ? "is-on" : ""}" data-action="toggle-pmo"></button>
+          <button class="toggle-switch ${settings.pmo_tracker_enabled ? "is-on" : ""}" data-action="toggle-pmo" aria-pressed="${settings.pmo_tracker_enabled}" aria-label="Aktifkan Anti-PMO Tracker"></button>
         </div>
         ${settings.pmo_tracker_enabled ? `
           <div class="flex-between mt-md">
@@ -968,9 +1071,35 @@ const App = {
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title">Jadwal Latihan</div>
+        <div class="settings-section-title">Jadwal Latihan ${AppData.getCustomSchedule() ? '<span class="text-caption">(Custom)</span>' : ""}</div>
         ${scheduleHTML}
-        <p class="text-caption mt-sm">Edit jadwal detail tersedia di versi mendatang.</p>
+        <button class="btn btn-secondary mt-sm" data-action="edit-schedule">EDIT JADWAL</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">AI Coach</div>
+        <p class="text-caption mb-md">"Bring your own key" — API key kamu TERSIMPAN LOKAL saja di device ini, dan panggilan dibuat LANGSUNG dari browser ke provider (VILLAIN ARC tidak punya server, jadi tidak ada perantara). Siapa pun yang bisa akses device/browser ini bisa melihat key-nya. Pakai cuma di device pribadi.</p>
+        <div class="toggle-row">
+          <span class="text-body">Aktifkan AI Coach</span>
+          <button class="toggle-switch ${aiSettings.enabled ? "is-on" : ""}" data-action="toggle-ai-coach" aria-pressed="${aiSettings.enabled}" aria-label="Aktifkan AI Coach"></button>
+        </div>
+        <div class="field mt-md">
+          <label class="field-label" for="ai-provider">Provider</label>
+          <select class="field-input" id="ai-provider">
+            <option value="anthropic" ${aiSettings.provider === "anthropic" ? "selected" : ""}>Anthropic (Claude)</option>
+            <option value="openai" ${aiSettings.provider === "openai" ? "selected" : ""}>OpenAI (ChatGPT)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label" for="ai-model">Model</label>
+          <input class="field-input" id="ai-model" value="${UI.escapeHtml(aiSettings.model)}" placeholder="mis. claude-sonnet-5 atau gpt-4o-mini" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="ai-key">API Key</label>
+          <input class="field-input" id="ai-key" type="password" value="${UI.escapeHtml(aiSettings.apiKey)}" placeholder="sk-ant-... atau sk-..." autocomplete="off" />
+        </div>
+        <button class="btn btn-secondary mb-sm" data-action="save-ai-settings">SIMPAN AI COACH</button>
+        <button class="btn btn-ghost" data-action="test-ai-connection">Test Koneksi</button>
       </div>
 
       <div class="settings-section">
@@ -994,6 +1123,193 @@ const App = {
       situp_target: parseInt(document.getElementById("set-situp").value, 10) || DEFAULT_TARGETS.situp_target
     });
     UI.toast("Profile tersimpan.");
+  },
+
+  renderScheduleEditor() {
+    const schedule = AppData.getSchedule();
+    const dayLabels = { monday: "Senin", tuesday: "Selasa", wednesday: "Rabu", thursday: "Kamis", friday: "Jumat", saturday: "Sabtu", sunday: "Minggu" };
+    const dayRows = DAY_KEYS.filter((k) => k !== "sunday").concat(["sunday"]).map((key) => {
+      const currentType = schedule[key].type;
+      const options = SCHEDULE_TEMPLATES.map((t) =>
+        `<option value="${t.type}" ${t.type === currentType ? "selected" : ""}>${t.emoji} ${UI.escapeHtml(t.label)}</option>`
+      ).join("");
+      return `
+        <div class="field">
+          <label class="field-label" for="sched-${key}">${dayLabels[key]}</label>
+          <select class="field-input" id="sched-${key}" data-day="${key}">${options}</select>
+          <button class="btn btn-ghost mt-sm" style="min-height:36px" data-action="edit-exercises" data-day="${key}" aria-label="Edit exercise untuk ${dayLabels[key]}">✏️ Edit Exercise</button>
+        </div>`;
+    }).join("");
+
+    UI.openModal(`
+      <div class="modal-handle"></div>
+      <h3 class="heading-m mb-md">Edit Jadwal</h3>
+      <p class="text-caption mb-md">Susun ulang harimu sendiri. Perubahan berlaku mulai sekarang — progress yang sudah tercatat tidak diubah.</p>
+      ${dayRows}
+      <button class="btn btn-secondary mb-sm" data-action="save-schedule">SIMPAN JADWAL</button>
+      <button class="btn btn-ghost" data-action="reset-schedule">Kembali ke Default</button>
+    `);
+  },
+
+  saveScheduleEdit() {
+    const selects = document.querySelectorAll("select[data-day]");
+    const newSchedule = {};
+    selects.forEach((sel) => {
+      const template = SCHEDULE_TEMPLATES.find((t) => t.type === sel.value);
+      if (!template) return;
+      // Deep clone supaya tiap hari punya array exercises miliknya sendiri,
+      // bukan reference bersama ke SCHEDULE_TEMPLATES.
+      newSchedule[sel.dataset.day] = JSON.parse(JSON.stringify(template));
+    });
+    AppData.setCustomSchedule(newSchedule);
+    UI.closeModal();
+    UI.toast("Jadwal baru disimpan. Waktumu, aturanmu.");
+    this.renderSettings();
+  },
+
+  resetScheduleToDefault() {
+    AppData.setCustomSchedule(null);
+    UI.closeModal();
+    UI.toast("Jadwal dikembalikan ke default.");
+    this.renderSettings();
+  },
+
+  editDayExercises(dayKey) {
+    // Baca tipe hari dari dropdown yang sedang tampil (kalau modal Edit
+    // Jadwal masih terbuka) — supaya kalau user BARU SAJA ganti tipe di
+    // dropdown (belum klik SIMPAN JADWAL), exercise yang muncul mengikuti
+    // tipe baru itu, bukan tipe lama yang masih tersimpan.
+    const select = document.getElementById(`sched-${dayKey}`);
+    const currentDay = AppData.getSchedule()[dayKey];
+    const type = select ? select.value : currentDay.type;
+    const baseExercises = currentDay.type === type
+      ? currentDay.exercises
+      : (SCHEDULE_TEMPLATES.find((t) => t.type === type)?.exercises || []);
+
+    this.state.exerciseEditDay = dayKey;
+    this.state.exerciseEditType = type;
+    this.state.exerciseEditList = JSON.parse(JSON.stringify(baseExercises));
+    this.renderExerciseEditor();
+  },
+
+  renderExerciseEditor() {
+    const type = this.state.exerciseEditType;
+    const template = SCHEDULE_TEMPLATES.find((t) => t.type === type);
+
+    if (type === "REST") {
+      UI.openModal(`
+        <div class="modal-handle"></div>
+        <h3 class="heading-m mb-md">${template.emoji} ${UI.escapeHtml(template.label)}</h3>
+        <p class="text-body">Hari istirahat tidak punya exercise untuk diedit.</p>
+        <button class="btn btn-ghost mt-md" data-action="cancel-exercise-edit">Kembali</button>
+      `);
+      return;
+    }
+
+    const list = this.state.exerciseEditList;
+    const rowsHTML = list.map((ex, i) => `
+      <div class="exercise-edit-row mb-md" data-idx="${i}">
+        <div class="field">
+          <label class="field-label" for="ex-name-${i}">Nama exercise ${i + 1}</label>
+          <input class="field-input" id="ex-name-${i}" data-field="name" value="${UI.escapeHtml(ex.name || "")}" placeholder="mis. Push-Up" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="ex-target-${i}">Target</label>
+          <input class="field-input" id="ex-target-${i}" data-field="target" value="${UI.escapeHtml(ex.target || "")}" placeholder="mis. 12-15 reps" />
+        </div>
+        <div class="flex-between" style="gap:var(--space-sm);align-items:flex-end">
+          <div class="field" style="flex:1;margin-bottom:0">
+            <label class="field-label" for="ex-sets-${i}">Set</label>
+            <input class="field-input" id="ex-sets-${i}" type="number" min="1" max="10" data-field="sets" value="${ex.sets || 1}" />
+          </div>
+          <div class="field" style="flex:1;margin-bottom:0">
+            <label class="field-label" for="ex-type-${i}">Tipe</label>
+            <select class="field-input" id="ex-type-${i}" data-field="inputType">
+              <option value="reps" ${ex.inputType !== "duration" ? "selected" : ""}>Reps</option>
+              <option value="duration" ${ex.inputType === "duration" ? "selected" : ""}>Durasi</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-danger mt-sm" style="width:auto;padding:0 var(--space-md)" data-action="remove-exercise-row" data-idx="${i}" aria-label="Hapus exercise ${UI.escapeHtml(ex.name || String(i + 1))}">Hapus</button>
+      </div>
+    `).join("");
+
+    UI.openModal(`
+      <div class="modal-handle"></div>
+      <h3 class="heading-m mb-md">Edit Exercise — ${template.emoji} ${UI.escapeHtml(template.label)}</h3>
+      <div id="exercise-rows">${rowsHTML || '<p class="text-caption mb-md">Belum ada exercise. Tambah di bawah.</p>'}</div>
+      <button class="btn btn-ghost mb-md" data-action="add-exercise-row">+ Tambah Exercise</button>
+      <button class="btn btn-secondary mb-sm" data-action="save-exercise-list">SIMPAN EXERCISE</button>
+      <button class="btn btn-ghost" data-action="cancel-exercise-edit">Batal</button>
+    `);
+  },
+
+  syncExerciseRowsFromDOM() {
+    const rows = document.querySelectorAll("#exercise-rows .exercise-edit-row");
+    const list = [];
+    rows.forEach((row) => {
+      list.push({
+        name: row.querySelector('[data-field="name"]').value.trim(),
+        target: row.querySelector('[data-field="target"]').value.trim(),
+        sets: Math.max(1, parseInt(row.querySelector('[data-field="sets"]').value, 10) || 1),
+        inputType: row.querySelector('[data-field="inputType"]').value
+      });
+    });
+    this.state.exerciseEditList = list;
+  },
+
+  addExerciseRow() {
+    this.syncExerciseRowsFromDOM();
+    this.state.exerciseEditList.push({ name: "", target: "", sets: 3, inputType: "reps" });
+    this.renderExerciseEditor();
+  },
+
+  removeExerciseRow(idx) {
+    this.syncExerciseRowsFromDOM();
+    this.state.exerciseEditList.splice(idx, 1);
+    this.renderExerciseEditor();
+  },
+
+  slugify(str) {
+    return (str || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "exercise";
+  },
+
+  saveExerciseList() {
+    this.syncExerciseRowsFromDOM();
+    const dayKey = this.state.exerciseEditDay;
+    const type = this.state.exerciseEditType;
+    const template = SCHEDULE_TEMPLATES.find((t) => t.type === type);
+
+    const usedIds = new Set();
+    const cleaned = this.state.exerciseEditList
+      .filter((ex) => ex.name && ex.name.trim()) // buang baris kosong/spasi-doang
+      .map((ex) => {
+        const base = this.slugify(ex.name);
+        let id = base, n = 2;
+        while (usedIds.has(id)) { id = `${base}-${n}`; n++; }
+        usedIds.add(id);
+        return { id, name: ex.name, target: ex.target, sets: ex.sets, inputType: ex.inputType, muscleGroup: "", notes: "" };
+      });
+
+    if (cleaned.length === 0) {
+      UI.toast("Minimal 1 exercise. Pilih ISTIRAHAT TOTAL kalau memang mau kosong.");
+      return;
+    }
+
+    // Mulai dari schedule EFEKTIF saat ini (custom kalau sudah ada, kalau
+    // belum ada clone dari default) supaya hari LAIN yang belum diubah tetap
+    // aman — cuma hari yang sedang diedit yang berubah.
+    const base = AppData.getCustomSchedule() || JSON.parse(JSON.stringify(WORKOUT_SCHEDULE_DEFAULT));
+    base[dayKey] = { type: template.type, label: template.label, color: template.color, emoji: template.emoji, exercises: cleaned };
+    AppData.setCustomSchedule(base);
+
+    UI.closeModal();
+    UI.toast("Exercise tersimpan.");
+    this.renderSettings();
+  },
+
+  cancelExerciseEdit() {
+    this.renderScheduleEditor();
   },
 
   async toggleNotif() {
@@ -1027,6 +1343,44 @@ const App = {
       AppData.setPmoStreak(0);
     }
     this.renderSettings();
+  },
+
+  saveAISettings() {
+    const provider = document.getElementById("ai-provider").value;
+    const model = document.getElementById("ai-model").value.trim();
+    const apiKey = document.getElementById("ai-key").value.trim();
+    AppData.setAISettings({ provider, model, apiKey });
+    UI.toast("Pengaturan AI Coach tersimpan.");
+    this.renderSettings();
+  },
+
+  toggleAICoach() {
+    const aiSettings = AppData.getAISettings();
+    if (!aiSettings.enabled && !aiSettings.apiKey) {
+      UI.toast("Isi & simpan API key dulu sebelum mengaktifkan.");
+      return;
+    }
+    AppData.setAISettings({ enabled: !aiSettings.enabled });
+    this.renderSettings();
+  },
+
+  async testAIConnection() {
+    // Baca nilai LIVE dari form (belum tentu sudah di-klik SIMPAN) supaya
+    // user bisa test dulu sebelum commit.
+    const provider = document.getElementById("ai-provider")?.value || "anthropic";
+    const model = document.getElementById("ai-model")?.value.trim();
+    const apiKey = document.getElementById("ai-key")?.value.trim();
+    if (!apiKey) {
+      UI.toast("Isi API key dulu.");
+      return;
+    }
+    UI.toast("Menguji koneksi...");
+    try {
+      await AICoach.testConnection({ provider, model, apiKey });
+      UI.toast("✅ Koneksi berhasil. API key valid.");
+    } catch (err) {
+      UI.toast(`⚠️ ${err.message}`);
+    }
   },
 
   resetPmo() {
@@ -1139,10 +1493,22 @@ const App = {
       case "save-body-stats": this.saveBodyStats(); break;
       case "badge-detail": this.showBadgeDetail(btn.dataset.id); break;
       case "save-profile": this.saveProfile(); break;
+      case "edit-schedule": this.renderScheduleEditor(); break;
+      case "save-schedule": this.saveScheduleEdit(); break;
+      case "reset-schedule": this.resetScheduleToDefault(); break;
+      case "edit-exercises": this.editDayExercises(btn.dataset.day); break;
+      case "add-exercise-row": this.addExerciseRow(); break;
+      case "remove-exercise-row": this.removeExerciseRow(parseInt(btn.dataset.idx, 10)); break;
+      case "save-exercise-list": this.saveExerciseList(); break;
+      case "cancel-exercise-edit": this.cancelExerciseEdit(); break;
       case "toggle-notif": this.toggleNotif(); break;
       case "select-preset": this.selectPreset(btn.dataset.msg); break;
       case "save-notif-settings": this.saveNotifSettings(); break;
       case "toggle-pmo": this.togglePmo(); break;
+      case "save-ai-settings": this.saveAISettings(); break;
+      case "toggle-ai-coach": this.toggleAICoach(); break;
+      case "test-ai-connection": this.testAIConnection(); break;
+      case "clear-coach-history": this.clearCoachHistory(); break;
       case "reset-pmo": this.resetPmo(); break;
       case "confirm-reset-pmo": this.confirmResetPmo(); break;
       case "export-data": this.exportData(); break;

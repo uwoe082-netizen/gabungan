@@ -12,6 +12,7 @@ class SpeechEngine {
     this.onWordResult = null;   // (result) => {}
     this.onStateChange = null;  // (state) => {}
     this.onError = null;        // (err) => {}
+    this.onTranscriptUpdate = null; // (text) => {} — teks mentah hasil pengenalan suara terkini, untuk ditampilkan live ke UI
     this._restartTimer = null;
     this._shouldContinue = false;
     this._segmentWordCounts = {}; // resultIndex -> jumlah kata yang sudah dicocokkan di segmen itu
@@ -46,6 +47,13 @@ class SpeechEngine {
     } catch (e) {
       // already started - ignore
     }
+  }
+
+  /** Dipanggil saat pengguna pakai tombol hint — majukan pointer tanpa menunggu ucapan,
+   *  supaya pengenalan suara tidak "nyangkut" mengharapkan kata yang sudah di-reveal manual. */
+  skipWord() {
+    if (typeof this.pointer !== 'number') this.pointer = 0;
+    if (this.targetWords && this.pointer < this.targetWords.length) this.pointer++;
   }
 
   stop() {
@@ -102,6 +110,13 @@ class SpeechEngine {
         delete this._segmentWordCounts[i];
       }
     }
+
+    // Teks mentah terkini (murni untuk tampilan live, tidak memengaruhi logika pencocokan di atas).
+    let liveText = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      liveText += event.results[i][0].transcript + ' ';
+    }
+    this.onTranscriptUpdate?.(liveText.trim());
   }
 
   /** Fuzzy match array kata BARU (belum pernah diproses) terhadap target words dengan lookahead */

@@ -373,6 +373,64 @@
   border: 1px solid var(--crimson-glow);
 }
 
+/* Konten cuma untuk screen reader — dipakai buat label input tanpa teks visual */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* === AI COACH === */
+.coach-empty {
+  text-align: center;
+  padding: var(--space-2xl) var(--space-md);
+}
+.coach-empty-icon { font-size: 40px; margin-bottom: var(--space-md); }
+.coach-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--space-sm) 2px;
+  margin-bottom: var(--space-md);
+}
+.coach-bubble {
+  max-width: 85%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-lg);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.coach-bubble--user {
+  align-self: flex-end;
+  background: var(--crimson-ghost);
+  border: 1px solid var(--crimson-glow);
+  color: var(--text-primary);
+}
+.coach-bubble--assistant {
+  align-self: flex-start;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+.coach-bubble--pending { color: var(--text-muted); font-style: italic; }
+.coach-bubble--error {
+  border-color: var(--crimson-glow);
+  color: var(--crimson-400);
+}
+.coach-input-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.coach-input-row .field-input { flex: 1; }
+
 /* === BOTTOM NAV === */
 .bottom-nav {
   position: sticky;

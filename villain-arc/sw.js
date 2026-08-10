@@ -1,4 +1,4 @@
-const CACHE_NAME = "villain-arc-v2";
+const CACHE_NAME = "villain-arc-v3";
 const PRECACHE_URLS = [
   "./",
   "./index.html",
@@ -15,6 +15,7 @@ const PRECACHE_URLS = [
   "./js/timer.js",
   "./js/notifications.js",
   "./js/ui.js",
+  "./js/ai-coach.js",
   "./js/app.js",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"

@@ -21,7 +21,9 @@ const LS_KEYS = {
   earlyRiserCount: "va_early_riser_count",
   dawnWarriorCount: "va_dawn_warrior_count",
   totalPushupReps: "va_total_pushup_reps",
-  heartbreakCompletedCount: "va_heartbreak_completed_count"
+  heartbreakCompletedCount: "va_heartbreak_completed_count",
+  aiSettings: "va_ai_settings",
+  aiChatHistory: "va_ai_chat_history"
 };
 
 const DEFAULT_SETTINGS = {
@@ -30,6 +32,16 @@ const DEFAULT_SETTINGS = {
   notification_message: NOTIFICATION_PRESETS ? NOTIFICATION_PRESETS[0] : "",
   pmo_tracker_enabled: false,
   sound_enabled: true
+};
+
+// AI Coach: "bring your own API key" — key TERSIMPAN LOKAL saja (localStorage
+// di device ini) dan panggilan API dibuat LANGSUNG dari browser ke provider.
+// Tidak pernah dikirim ke server manapun milik VILLAIN ARC (tidak ada server).
+const DEFAULT_AI_SETTINGS = {
+  enabled: false,
+  provider: "anthropic", // "anthropic" | "openai"
+  apiKey: "",
+  model: "claude-sonnet-5"
 };
 
 const Store = {
@@ -56,6 +68,12 @@ const Store = {
   },
   clearAll() {
     Object.values(LS_KEYS).forEach((k) => localStorage.removeItem(k));
+    // va_reminder_seen_<tanggal> dibuat dinamis di notifications.js (di luar
+    // LS_KEYS karena key-nya berubah tiap hari) — ikut disapu di sini supaya
+    // "Reset Semua Data" benar-benar bersih total, bukan cuma yang terdaftar.
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith("va_reminder_seen_"))
+      .forEach((k) => localStorage.removeItem(k));
   }
 };
 
@@ -142,11 +160,25 @@ const AppData = {
   getHeartbreakCompletedCount() { return Store.get(LS_KEYS.heartbreakCompletedCount, 0); },
   setHeartbreakCompletedCount(v) { Store.set(LS_KEYS.heartbreakCompletedCount, v); },
 
+  getAISettings() { return { ...DEFAULT_AI_SETTINGS, ...Store.get(LS_KEYS.aiSettings, {}) }; },
+  setAISettings(v) { Store.set(LS_KEYS.aiSettings, { ...this.getAISettings(), ...v }); },
+  getAIChatHistory() { return Store.get(LS_KEYS.aiChatHistory, []); },
+  setAIChatHistory(v) { Store.set(LS_KEYS.aiChatHistory, v); },
+  clearAIChatHistory() { Store.remove(LS_KEYS.aiChatHistory); },
+
   exportAll() {
     const dump = {};
     Object.entries(LS_KEYS).forEach(([name, key]) => {
       dump[key] = Store.get(key, null);
     });
+    // API key SENGAJA tidak ikut ke-export — file backup ini sering dibagikan
+    // (dikirim ke device lain, disimpan di cloud drive, dsb), dan API key
+    // adalah kredensial rahasia, beda kelas dari data workout biasa. Setting
+    // AI Coach lain (provider/model/enabled) tetap ikut supaya UX restore
+    // tetap nyaman — user cuma perlu isi ulang key-nya setelah import.
+    if (dump[LS_KEYS.aiSettings]) {
+      dump[LS_KEYS.aiSettings] = { ...dump[LS_KEYS.aiSettings], apiKey: "" };
+    }
     return dump;
   },
   importAll(dump) {

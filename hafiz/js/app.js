@@ -38,8 +38,10 @@ const App = (() => {
     if (!state.profile) {
       renderOnboarding();
     } else {
+      if (typeof state.profile.totalMurojaahSessions !== 'number') state.profile.totalMurojaahSessions = 0;
       state.profile = Gamification.updateStreak(state.profile);
       Storage.lsSet('profile', state.profile);
+      await refreshBadges();
       handleRoute();
     }
 
@@ -199,7 +201,7 @@ const App = (() => {
     state.profile = {
       name: data.name, targetJuz: data.target,
       xp: 0, streak: 0, freezeAvailable: 0, lastActiveDate: null,
-      badges: [], createdAt: Utils.todayISO()
+      badges: [], totalMurojaahSessions: 0, createdAt: Utils.todayISO()
     };
     Storage.lsSet('profile', state.profile);
     state.settings = defaultSettings();
@@ -442,7 +444,11 @@ const App = (() => {
         <div class="mushaf-page" id="mushaf-page-el"><div class="mushaf-empty">Memuat…</div></div>
       </div>
       <p id="setoran-status" style="text-align:center;font-size:.8rem;color:var(--color-text-secondary);margin-top:.75rem;">Tekan tombol mikrofon untuk mulai setoran.</p>
-      <button class="btn btn-outline btn-block" id="cancel-setoran" style="margin-top:.5rem;">Batal</button>
+      <p id="setoran-transcript" dir="rtl" style="text-align:center;font-family:var(--font-arabic);font-size:.85rem;color:var(--color-text-secondary);min-height:1.4em;margin-top:.25rem;opacity:.75;"></p>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+        <button class="btn btn-outline btn-block" id="cancel-setoran">Batal</button>
+        <button class="btn btn-outline btn-block" id="hint-btn">💡 Bantuan</button>
+      </div>
     `;
     document.getElementById('cancel-setoran').addEventListener('click', () => history.back());
 
@@ -458,6 +464,18 @@ const App = (() => {
     state.activeSession = { type: sessionType, pageNumber, speech, reveal, errorsList: [] };
 
     const statusEl = document.getElementById('setoran-status');
+    const transcriptEl = document.getElementById('setoran-transcript');
+    const hintBtn = document.getElementById('hint-btn');
+
+    hintBtn.addEventListener('click', () => {
+      const idx = reveal.currentIndex;
+      if (idx >= reveal.total) return;
+      reveal.markHint(idx);
+      reveal.revealNextWord();
+      speech.skipWord?.();
+      reveal.setActive(Math.min(idx + 1, reveal.total - 1));
+      statusEl.textContent = `Kata ${reveal.getProgress().revealed}/${reveal.total} · Akurasi berjalan ${reveal.getSummary().accuracy}%`;
+    });
 
     if (!speech.supported) {
       statusEl.innerHTML = `⚠️ Browser ini tidak mendukung pengenalan suara. Gunakan Chrome/Edge, atau <button class="btn btn-sm btn-ghost" id="manual-mode-btn">tandai manual</button>.`;
@@ -474,11 +492,16 @@ const App = (() => {
       } else if (s === 'idle') {
         fabMic.classList.remove('listening');
         fabMic.querySelector('.pulse-ring').style.display = 'none';
+        transcriptEl.textContent = '';
       } else if (s === 'error') {
         fabMic.classList.add('error-state');
       } else if (s === 'complete') {
+        transcriptEl.textContent = '';
         finishSetoran(pageNumber, sessionType, reveal, state.activeSession.errorsList);
       }
+    };
+    speech.onTranscriptUpdate = (text) => {
+      transcriptEl.textContent = text ? `"${text}"` : '';
     };
     speech.onError = (err) => {
       switch (err.type) {
@@ -556,12 +579,16 @@ const App = (() => {
 
     const xp = Gamification.xpForSession(sessionType, summary.accuracy);
     state.profile.xp += xp;
+    if (sessionType === 'manzil') state.profile.totalMurojaahSessions = (state.profile.totalMurojaahSessions || 0) + 1;
     Storage.lsSet('profile', state.profile);
 
     // Kontribusi ke XP global lintas-app (opsional, tidak mengubah XP lokal di atas)
     if (typeof SharedGamification !== 'undefined') {
       SharedGamification.awardXP('hafiz', xp, sessionType);
     }
+
+    await logSession({ pageNumber, sessionType, accuracy: summary.accuracy, xp });
+    await refreshBadges();
 
     showSummaryModal({ summary, xp, record, pageNumber, sessionType });
   }
@@ -575,9 +602,10 @@ const App = (() => {
         <h2>${summary.accuracy >= 85 ? 'Alhamdulillah, Mantap!' : 'Terus Semangat!'}</h2>
         <p style="font-size:.8rem;color:var(--color-text-secondary);">Halaman ${pageNumber} · ${sessionType.toUpperCase()}</p>
         <div class="score-ring-wrap">${scoreRingSVG(summary.accuracy)}</div>
-        <div class="summary-grid">
-          <div class="summary-cell"><div class="summary-num ok">${summary.total - summary.errors}</div><div class="summary-label">Benar</div></div>
+        <div class="summary-grid" style="grid-template-columns:repeat(${summary.hints > 0 ? 4 : 3}, 1fr);">
+          <div class="summary-cell"><div class="summary-num ok">${summary.total - summary.errors - summary.hints}</div><div class="summary-label">Benar</div></div>
           <div class="summary-cell"><div class="summary-num err">${summary.errors}</div><div class="summary-label">Salah</div></div>
+          ${summary.hints > 0 ? `<div class="summary-cell"><div class="summary-num hint">${summary.hints}</div><div class="summary-label">Bantuan</div></div>` : ''}
           <div class="summary-cell"><div class="summary-num hint">+${xp}</div><div class="summary-label">XP</div></div>
         </div>
         <p style="font-size:.75rem;">${summary.accuracy >= 85 ? `Status halaman ini sekarang: <strong>${record.status}</strong>. Review berikutnya: ${record.nextReview}.` : 'Skor di bawah 85% — disarankan tikrar lagi sebelum lanjut.'}</p>
@@ -672,12 +700,86 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------
+  // Riwayat sesi (session log)
+  // ---------------------------------------------------------
+  async function logSession({ pageNumber, sessionType, accuracy, xp }) {
+    await Storage.put('sessions', {
+      id: Utils.uid(),
+      pageNumber, sessionType, accuracy, xp,
+      timestamp: Date.now(),
+      dateISO: Utils.todayISO()
+    });
+  }
+
+  // ---------------------------------------------------------
+  // Badge system
+  // ---------------------------------------------------------
+  /** Hitung data yang dibutuhkan Gamification.checkBadges() dari data yang tersedia saat ini.
+   *  Beberapa field (mis. dailySetoranStreak) memakai pendekatan sederhana karena
+   *  model data saat ini belum melacak streak per-jenis-sesi secara terpisah. */
+  function computeBadgeStats(records, sessions) {
+    const fatihahRecord = records.find(r => r.pageNumber === 1);
+    const fatihahMemorized = !!(fatihahRecord && fatihahRecord.firstMemorized);
+
+    const lastSession = sessions[sessions.length - 1];
+    const lastHour = lastSession ? new Date(lastSession.timestamp).getHours() : -1;
+    const qiyamulLailSession = lastHour >= 3 && lastHour < 5;
+
+    const maxTikrar = records.reduce((m, r) => Math.max(m, r.tikrarCount || 0), 0);
+
+    // 3 sesi terakhir (kronologis) semuanya 100% akurasi.
+    // Catatan: dihitung dari 3 sesi terakhir, bukan wajib 3 halaman berbeda.
+    const last3 = sessions.slice(-3);
+    const perfectStreak3 = last3.length === 3 && last3.every(s => s.accuracy === 100);
+
+    // Juz dianggap selesai bila >=18 dari halamannya sudah berstatus bukan 'new'
+    // (heuristik sama seperti Peta 30 Juz di halaman Statistik).
+    const juzCounts = {};
+    records.filter(r => r.status !== 'new').forEach(r => { if (r.juz) juzCounts[r.juz] = (juzCounts[r.juz] || 0) + 1; });
+    const juzCompleted = Object.values(juzCounts).filter(c => c >= 18).length;
+
+    const mutqinPageStreak = records.reduce((m, r) => Math.max(m, r.streakCorrect || 0), 0);
+
+    const totalMurojaahPages = state.profile.totalMurojaahSessions || 0;
+
+    // Belum ada pelacakan streak khusus sesi-setoran terpisah dari streak harian umum.
+    const dailySetoranStreak = state.profile.streak || 0;
+
+    return { fatihahMemorized, qiyamulLailSession, maxTikrar, perfectStreak3, juzCompleted, mutqinPageStreak, totalMurojaahPages, dailySetoranStreak };
+  }
+
+  /** Cek & simpan badge baru yang layak didapat. Aman dipanggil berkali-kali (idempotent). */
+  async function refreshBadges() {
+    const records = await Storage.getAll('hafalan');
+    const sessions = (await Storage.getAll('sessions')).sort((a, b) => a.timestamp - b.timestamp);
+    const stats = computeBadgeStats(records, sessions);
+    const { badges, newly } = Gamification.checkBadges(state.profile, stats);
+    if (newly.length) {
+      state.profile.badges = badges;
+      Storage.lsSet('profile', state.profile);
+      announceNewBadges(newly);
+    }
+    return newly;
+  }
+
+  function announceNewBadges(newly) {
+    const found = newly.map(id => Gamification.BADGES.find(b => b.id === id)).filter(Boolean);
+    if (!found.length) return;
+    const msg = found.length === 1
+      ? `${found[0].emoji} Badge baru terbuka: ${found[0].name}!`
+      : `🏆 ${found.length} badge baru terbuka: ${found.map(b => b.name).join(', ')}!`;
+    showToast(msg);
+  }
+
+  // ---------------------------------------------------------
   // Stats
   // ---------------------------------------------------------
   async function renderStats() {
     const records = await Storage.getAll('hafalan');
+    const sessions = await Storage.getAll('sessions');
     const memorized = records.filter(r => r.status !== 'new');
     const weakWords = records.flatMap(r => r.weakWords || []).sort((a, b) => b.errorCount - a.errorCount).slice(0, 8);
+    const recentSessions = sessions.sort((a, b) => b.timestamp - a.timestamp).slice(0, 15);
 
     const juzSet = {};
     memorized.forEach(r => { if (r.juz) juzSet[r.juz] = (juzSet[r.juz] || 0) + 1; });
@@ -702,6 +804,11 @@ const App = (() => {
         <div class="bar-chart">${buildBarChart(records)}</div>
       </div>
 
+      <div class="section-title">Riwayat Sesi Terbaru</div>
+      <div class="card">
+        ${recentSessions.length ? recentSessions.map(sessionRowHtml).join('') : `<div class="empty-state"><div class="empty-icon">🎙️</div>Belum ada sesi setoran tercatat.</div>`}
+      </div>
+
       <div class="section-title">Kata yang Sering Salah</div>
       <div class="card">
         ${weakWords.length ? weakWords.map(w => `
@@ -711,6 +818,22 @@ const App = (() => {
           </div>`).join('') : `<div class="empty-state"><div class="empty-icon">✨</div>Belum ada catatan kesalahan.</div>`}
       </div>
     `;
+  }
+
+  function sessionRowHtml(s) {
+    const d = new Date(s.timestamp);
+    const waktu = `${d.getDate()}/${d.getMonth() + 1} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const typeLabel = { sabak: 'Sabak', sabqi: 'Sabqi', manzil: 'Manzil' }[s.sessionType] || s.sessionType;
+    const accColor = s.accuracy >= 85 ? 'var(--color-success)' : s.accuracy >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
+    return `
+      <div class="weak-word-row">
+        <span>
+          <span class="badge-chip">${typeLabel}</span>
+          <span style="font-size:.75rem;margin-left:.4rem;">Halaman ${s.pageNumber}</span>
+          <div style="font-size:.65rem;color:var(--color-text-secondary);">${waktu}</div>
+        </span>
+        <span class="ww-count" style="color:${accColor};">${s.accuracy}%</span>
+      </div>`;
   }
 
   function buildHeatmap(records) {
