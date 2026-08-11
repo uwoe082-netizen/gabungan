@@ -1201,6 +1201,15 @@ const App = {
         <p class="text-caption mb-sm">${aiSettings.autoApply
           ? "⚠️ AKTIF: AI langsung mengeksekusi perubahan jadwal/target/notifikasi begitu ia memutuskan itu perlu, berdasarkan perbandingan progress vs target — TANPA konfirmasi kamu dulu. Setiap perubahan tetap tercatat di chat supaya bisa kamu cek/undo manual."
           : "Nonaktif: tiap usulan AI muncul sebagai kartu di chat dengan tombol Terapkan/Tolak, kamu yang putuskan."}</p>
+        <div class="toggle-row">
+          <span class="text-body">Akses Internet (Web Search)</span>
+          <button class="toggle-switch ${aiSettings.webSearch ? "is-on" : ""}" data-action="toggle-ai-websearch" aria-pressed="${aiSettings.webSearch}" aria-label="Aktifkan pencarian web AI Coach"></button>
+        </div>
+        <p class="text-caption mb-sm">${aiSettings.provider === "openai"
+          ? "⚠️ Provider OpenAI (chat/completions) di build ini belum mendukung pencarian web native — toggle ini hanya aktif untuk Anthropic & Gemini. Ganti provider kalau mau fitur ini."
+          : (aiSettings.webSearch
+            ? "🌐 AKTIF: Coach boleh riset ke internet (nutrisi, sains olahraga, teknik, dsb) dan gabungkan dengan data progress kamu sebelum menjawab/mengusulkan perubahan — bukan cuma modal data internal."
+            : "Nonaktif: Coach cuma jawab dari data kamu + pengetahuan bawaan model, tanpa riset internet real-time.")}</p>
         <button class="btn btn-secondary mb-sm" data-action="save-ai-settings">SIMPAN AI COACH</button>
         <button class="btn btn-ghost" data-action="test-ai-connection">Test Koneksi</button>
       </div>
@@ -1489,6 +1498,12 @@ const App = {
     this.renderSettings();
   },
 
+  toggleAIWebSearch() {
+    const aiSettings = AppData.getAISettings();
+    AppData.setAISettings({ webSearch: !aiSettings.webSearch });
+    this.renderSettings();
+  },
+
   async testAIConnection() {
     // Baca nilai LIVE dari form (belum tentu sudah di-klik SIMPAN) supaya
     // user bisa test dulu sebelum commit.
@@ -1633,6 +1648,7 @@ const App = {
       case "save-ai-settings": this.saveAISettings(); break;
       case "toggle-ai-coach": this.toggleAICoach(); break;
       case "toggle-ai-autoapply": this.toggleAIAutoApply(); break;
+      case "toggle-ai-websearch": this.toggleAIWebSearch(); break;
       case "test-ai-connection": this.testAIConnection(); break;
       case "load-ai-models": this.loadAIModels(); break;
       case "apply-ai-proposal": this.applyAIProposal(btn.dataset.id); break;

@@ -42,7 +42,8 @@ const DEFAULT_AI_SETTINGS = {
   provider: "anthropic", // "anthropic" | "openai" | "gemini"
   apiKey: "",
   model: "claude-sonnet-5",
-  autoApply: false // true = usulan perubahan jadwal/target/notifikasi langsung dieksekusi tanpa konfirmasi
+  autoApply: false, // true = usulan perubahan jadwal/target/notifikasi langsung dieksekusi tanpa konfirmasi
+  webSearch: false  // true = AI boleh cari referensi di internet (riset olahraga/nutrisi terkini) sebelum menjawab/mengusulkan
 };
 
 const Store = {

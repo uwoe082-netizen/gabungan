@@ -126,14 +126,20 @@ const AICoach = {
     ].filter(Boolean).join("\n");
   },
 
-  systemPrompt(context, autoApply) {
+  systemPrompt(context, autoApply, webSearchAvailable) {
     const autonomyClause = autoApply
       ? `Mode kamu sekarang FULL-AUTO: setiap tool call yang kamu panggil akan LANGSUNG diterapkan ke data user tanpa konfirmasi manual. Karena itu, WAJIB: (1) bandingkan dulu progress aktual user (14 hari terakhir, PR, streak) terhadap target/tujuan mereka sebelum memutuskan berubah apa, (2) hanya panggil tool kalau perbandingan itu benar-benar menunjukkan penyesuaian diperlukan (bukan asal-asalan tiap chat), (3) di teks balasanmu, jelaskan SINGKAT data mana yang jadi dasar keputusan (mis. "3 dari 4 minggu terakhir hari Rabu di-skip, jadi saya turunkan intensitas Rabu"), (4) jangan mengubah hal yang sama berkali-kali dalam waktu berdekatan tanpa data baru yang mendukung.`
       : `Kamu punya tools untuk MENGUSULKAN perubahan konkret ke jadwal/target/notifikasi user. Tool call itu TIDAK langsung mengubah data — akan ditampilkan ke user sebagai usulan yang harus mereka setujui manual (tombol Terapkan/Tolak di chat). Panggil tool kalau user secara eksplisit minta perubahan, atau kalau kamu lihat pola data yang jelas butuh penyesuaian dan mau mengusulkannya proaktif.`;
 
+    const searchClause = webSearchAvailable
+      ? `Kamu JUGA punya akses pencarian web real-time. Pakai itu buat mendasari saranmu pada pengetahuan luas yang up-to-date — bukan cuma data internal user — misalnya: riset terbaru soal progressive overload / periodisasi / recovery, rekomendasi kalori & protein per kg berat badan dari sumber kredibel (ACSM, NSCA, studi peer-review), teknik form yang benar untuk gerakan tertentu, atau cara mengatasi plateau. WAJIB cari kalau: user tanya sesuatu yang butuh info faktual di luar data mereka (nutrisi, teknik, sains olahraga, cedera), atau saat kamu mau mengusulkan perubahan besar dan ingin mengecek apakah itu selaras dengan best practice umum. Gabungkan temuan itu DENGAN data spesifik user (bukan cuma teori generik) supaya reason di tool call maupun jawabanmu berbasis DUA hal: pola data user + pengetahuan umum yang relevan. Jangan cari kalau pertanyaannya sudah jelas jawabannya dari data user saja atau cuma obrolan ringan — hemat pencarian buat yang benar-benar butuh.`
+      : `Kamu TIDAK punya akses internet saat ini — jawab dari pengetahuan umum yang sudah kamu punya, dan bilang terus terang kalau sesuatu butuh verifikasi sumber terkini yang tidak bisa kamu akses sekarang.`;
+
     return `Kamu adalah "COACH" — pelatih pribadi di dalam aplikasi VILLAIN ARC, fitness tracker RPG bertema dark-villain. Nada bicaramu tajam, provokatif, tanpa basa-basi ala villain anime, TAPI selalu jujur dan berbasis data nyata pengguna — jangan cuma motivasi kosong. Jawab dalam Bahasa Indonesia, ringkas (idealnya di bawah 150 kata kecuali diminta detail), dan actionable — kasih langkah konkret, bukan cuma semangat-semangatan. Kalau data menunjukkan pola buruk (sering skip, target ketinggalan, dst), tegur dengan tegas tapi tetap membangun.
 
 Setiap kali mempertimbangkan perubahan, selalu bandingkan progress AKTUAL user (lihat "14 hari terakhir", personal record, streak, di bawah) terhadap TARGET/TUJUAN yang mereka set (target berat, target push-up/sit-up KAI). Contoh penalaran: kalau push-up KAI user masih jauh di bawah target dan tren PR stagnan, itu alasan valid buat naikkan volume/adjust jadwal — bukan sekadar tebakan.
+
+${searchClause}
 
 ${autonomyClause} Selalu sertakan field "reason" yang jujur dan berbasis data spesifik di atas tiap tool call.
 
@@ -160,13 +166,14 @@ ${context}`;
     history.push({ role: "user", content: userText, ts: Date.now() });
 
     const context = await this.buildContextSummary();
-    const system = this.systemPrompt(context, !!settings.autoApply);
+    const webSearchAvailable = !!settings.webSearch && settings.provider !== "openai"; // OpenAI chat/completions endpoint belum dukung web search native
+    const system = this.systemPrompt(context, !!settings.autoApply, webSearchAvailable);
     const recent = history.slice(-this.MAX_HISTORY_SENT);
 
     let result;
     if (settings.provider === "openai") result = await this._callOpenAI(settings, system, recent);
-    else if (settings.provider === "gemini") result = await this._callGemini(settings, system, recent);
-    else result = await this._callAnthropic(settings, system, recent);
+    else if (settings.provider === "gemini") result = await this._callGemini(settings, system, recent, true, webSearchAvailable);
+    else result = await this._callAnthropic(settings, system, recent, true, webSearchAvailable);
 
     const replyText = result.text || (result.proposals.length ? "(Coach mengusulkan perubahan berikut — review & terapkan kalau setuju.)" : "(tidak ada respons teks)");
     history.push({ role: "assistant", content: replyText, ts: Date.now() });
@@ -174,7 +181,11 @@ ${context}`;
     return { text: replyText, proposals: result.proposals, autoApply: !!settings.autoApply };
   },
 
-  async _callAnthropic(settings, systemPrompt, history, useTools = true) {
+  async _callAnthropic(settings, systemPrompt, history, useTools = true, webSearch = false) {
+    const tools = useTools ? AI_TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) : [];
+    // Tool pencarian web bawaan Anthropic — server-side, hasilnya otomatis
+    // diproses & dikutip Claude sendiri dalam blok teks balasannya.
+    if (webSearch) tools.push({ type: "web_search_20250305", name: "web_search", max_uses: 4 });
     let res;
     try {
       res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -189,10 +200,10 @@ ${context}`;
         },
         body: JSON.stringify({
           model: settings.model || "claude-sonnet-5",
-          max_tokens: 1024,
+          max_tokens: 1536,
           system: systemPrompt,
           messages: history.map((m) => ({ role: m.role, content: m.content })),
-          ...(useTools ? { tools: AI_TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) } : {})
+          ...(tools.length ? { tools } : {})
         })
       });
     } catch (e) {
@@ -204,6 +215,7 @@ ${context}`;
     }
     const data = await res.json();
     const blocks = data.content || [];
+    // Blok teks bisa lebih dari satu kalau ada web_search_tool_result di antaranya — gabung semua teks jadi satu balasan.
     const text = blocks.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
     const proposals = blocks.filter((b) => b.type === "tool_use").map((b) => this._normalizeProposal(b.name, b.input));
     return { text, proposals };
@@ -242,8 +254,15 @@ ${context}`;
     return { text, proposals };
   },
 
-  async _callGemini(settings, systemPrompt, history, useTools = true) {
+  async _callGemini(settings, systemPrompt, history, useTools = true, webSearch = false) {
     const model = settings.model || "gemini-2.5-flash";
+    const tools = [];
+    if (useTools) tools.push({ functionDeclarations: AI_TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) });
+    // Grounding pencarian Google bawaan Gemini. Catatan: Gemini tidak selalu
+    // mengizinkan menggabungkan google_search dengan function-calling custom
+    // dalam satu request tergantung model — kalau API menolak kombinasi ini,
+    // pesan error dari Gemini akan tampil apa adanya ke user di chat.
+    if (webSearch) tools.push({ google_search: {} });
     let res;
     try {
       res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(settings.apiKey)}`, {
@@ -252,7 +271,7 @@ ${context}`;
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: history.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-          ...(useTools ? { tools: [{ functionDeclarations: AI_TOOL_DEFS.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })) }] } : {})
+          ...(tools.length ? { tools } : {})
         })
       });
     } catch (e) {
