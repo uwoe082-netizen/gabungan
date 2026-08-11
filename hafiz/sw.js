@@ -3,7 +3,7 @@
    Service Worker: cache-first assets, network-first Quran API
    ============================================================ */
 
-const CACHE_VERSION = 'hafiz-v1';
+const CACHE_VERSION = 'hafiz-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
 
