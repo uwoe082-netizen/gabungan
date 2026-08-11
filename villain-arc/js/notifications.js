@@ -2,6 +2,20 @@
 // VILLAIN ARC — Notification logic
 // ============================================================
 
+// Public VAPID key punya push-server (lihat push-server/README.md).
+// Ini AMAN untuk ditaruh di client — VAPID public key memang didesain publik,
+// yang wajib rahasia cuma private key-nya (disimpan sbg Cloudflare secret).
+const VAPID_PUBLIC_KEY = "BEiNnsf5pfUBmk905tJcOjpxE4BGKxdHUa0fsY9xB8pAvVIDLsTqHgbvGYsjoSewW6FlwLGk7GFkfgrsJZZNwt4";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
 const Notifications = {
   async requestPermission() {
     if (!("Notification" in window)) return "unsupported";
@@ -92,5 +106,79 @@ const Notifications = {
       title: "VILLAIN ARC ⚔️",
       body: this.buildTodayMessage()
     };
+  },
+
+  // ------------------------------------------------------------
+  // PUSH SERVER (opsional) — supaya notifikasi tetap masuk walau
+  // app/browser tertutup. Butuh Worker URL dari push-server/README.md.
+  // ------------------------------------------------------------
+
+  async subscribeToPush(workerUrl) {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      throw new Error("Browser ini tidak mendukung Push API.");
+    }
+    const perm = await this.requestPermission();
+    if (perm !== "granted") throw new Error("Izin notifikasi ditolak.");
+
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    const settings = AppData.getSettings();
+    const tzOffsetMinutes = -new Date().getTimezoneOffset(); // menit di timur UTC (WIB = 420)
+
+    const res = await fetch(workerUrl.replace(/\/+$/, "") + "/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscription: sub.toJSON(),
+        notification_time: settings.notification_time || "04:55",
+        message: settings.notification_message || "",
+        tz_offset_minutes: tzOffsetMinutes
+      })
+    });
+    if (!res.ok) throw new Error(`Push server menolak (HTTP ${res.status}). Cek Worker URL & deployment.`);
+    Store.set("va_push_endpoint", sub.endpoint);
+    Store.set("va_push_worker_url", workerUrl);
+    return sub;
+  },
+
+  async unsubscribeFromPush() {
+    const workerUrl = Store.get("va_push_worker_url", "");
+    const reg = await navigator.serviceWorker.ready.catch(() => null);
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    if (sub) {
+      if (workerUrl) {
+        await fetch(workerUrl.replace(/\/+$/, "") + "/unsubscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: sub.endpoint })
+        }).catch(() => {});
+      }
+      await sub.unsubscribe().catch(() => {});
+    }
+    Store.set("va_push_endpoint", null);
+  },
+
+  isPushSubscribed() {
+    return !!Store.get("va_push_endpoint", null);
+  },
+
+  async sendTestPush(workerUrl) {
+    const endpoint = Store.get("va_push_endpoint", null);
+    if (!endpoint) throw new Error("Belum aktifkan push server.");
+    const res = await fetch(workerUrl.replace(/\/+$/, "") + "/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
   }
 };

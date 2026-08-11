@@ -1092,6 +1092,8 @@ const App = {
     const settings = AppData.getSettings();
     const schedule = AppData.getSchedule();
     const aiSettings = AppData.getAISettings();
+    const pushWorkerUrl = Store.get("va_push_worker_url", "");
+    const pushSubscribed = Notifications.isPushSubscribed();
 
     const presetsHTML = NOTIFICATION_PRESETS.map((p) => `
       <button class="preset-msg ${settings.notification_message === p ? "is-selected" : ""}" data-action="select-preset" data-msg="${UI.escapeHtml(p)}">${UI.escapeHtml(p)}</button>
@@ -1144,6 +1146,21 @@ const App = {
         <label class="field-label mt-md">Pesan Preset</label>
         ${presetsHTML}
         <button class="btn btn-secondary mt-sm" data-action="save-notif-settings">SIMPAN NOTIFIKASI</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Push Server (Notifikasi Terjadwal)</div>
+        <p class="text-caption mb-sm">Push Notification biasa cuma jalan kalau app dibuka. Sambungkan ke push-server kamu sendiri (gratis, Cloudflare Worker — lihat push-server/README.md) supaya notifikasi tetap masuk tepat jam target walau app tertutup.</p>
+        <div class="field">
+          <label class="field-label" for="push-worker-url">Push Server URL</label>
+          <input class="field-input" id="push-worker-url" value="${UI.escapeHtml(pushWorkerUrl)}" placeholder="https://villain-arc-push.namamu.workers.dev" />
+        </div>
+        <p class="text-caption mb-sm" id="push-status">${pushSubscribed ? "✅ Aktif — notifikasi terjadwal jalan lewat push server." : "Belum aktif."}</p>
+        <div class="flex-between" style="gap:var(--space-sm)">
+          <button class="btn btn-secondary" data-action="subscribe-push">Aktifkan Push Server</button>
+          <button class="btn btn-ghost" data-action="test-push">Kirim Tes Notifikasi</button>
+        </div>
+        ${pushSubscribed ? `<button class="btn btn-ghost mt-sm" data-action="unsubscribe-push">Nonaktifkan</button>` : ""}
       </div>
 
       <div class="settings-section">
@@ -1446,6 +1463,40 @@ const App = {
     UI.toast("Pengaturan notifikasi tersimpan.");
   },
 
+  async subscribePush() {
+    const url = document.getElementById("push-worker-url")?.value.trim();
+    if (!url) { UI.toast("Isi Push Server URL dulu (lihat push-server/README.md)."); return; }
+    const status = document.getElementById("push-status");
+    if (status) status.textContent = "Mendaftarkan...";
+    try {
+      await Notifications.subscribeToPush(url);
+      UI.toast("Push server aktif — notifikasi akan masuk sesuai jam yang di-set.");
+      this.renderSettings();
+    } catch (err) {
+      if (status) status.textContent = `⚠️ ${err.message}`;
+      UI.toast(err.message);
+    }
+  },
+
+  async unsubscribePush() {
+    await Notifications.unsubscribeFromPush();
+    UI.toast("Push server dinonaktifkan.");
+    this.renderSettings();
+  },
+
+  async testPush() {
+    const url = document.getElementById("push-worker-url")?.value.trim() || Store.get("va_push_worker_url", "");
+    if (!url) { UI.toast("Isi & aktifkan Push Server URL dulu."); return; }
+    const status = document.getElementById("push-status");
+    try {
+      await Notifications.sendTestPush(url);
+      if (status) status.textContent = "Tes terkirim — cek notifikasi HP kamu (beberapa detik).";
+    } catch (err) {
+      if (status) status.textContent = `⚠️ ${err.message}`;
+      UI.toast(err.message);
+    }
+  },
+
   togglePmo() {
     const settings = AppData.getSettings();
     settings.pmo_tracker_enabled = !settings.pmo_tracker_enabled;
@@ -1644,6 +1695,9 @@ const App = {
       case "toggle-notif": this.toggleNotif(); break;
       case "select-preset": this.selectPreset(btn.dataset.msg); break;
       case "save-notif-settings": this.saveNotifSettings(); break;
+      case "subscribe-push": this.subscribePush(); break;
+      case "unsubscribe-push": this.unsubscribePush(); break;
+      case "test-push": this.testPush(); break;
       case "toggle-pmo": this.togglePmo(); break;
       case "save-ai-settings": this.saveAISettings(); break;
       case "toggle-ai-coach": this.toggleAICoach(); break;

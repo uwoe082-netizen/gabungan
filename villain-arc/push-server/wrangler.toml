@@ -1,0 +1,19 @@
+name = "villain-arc-push"
+main = "index.js"
+compatibility_date = "2024-11-01"
+
+# Jalan tiap menit — worker cuma ngecek jam & kirim push kalau memang cocok,
+# jadi biaya/free-tier tetap ringan buat pemakaian pribadi.
+[triggers]
+crons = ["* * * * *"]
+
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS"
+id = "PASTE_KV_NAMESPACE_ID_DI_SINI"
+
+[vars]
+VAPID_SUBJECT = "mailto:ganti-dengan-emailmu@example.com"
+VAPID_PUBLIC_KEY = "PASTE_VAPID_PUBLIC_KEY_DI_SINI"
+
+# VAPID_PRIVATE_JWK di-set lewat `wrangler secret put VAPID_PRIVATE_JWK`,
+# JANGAN taruh di sini / commit ke git.
