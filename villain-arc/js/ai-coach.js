@@ -41,9 +41,9 @@ const AI_TOOL_DEFS = [
     parameters: {
       type: "object",
       properties: {
-        weight_kg: { type: ["number", "null"], description: "Target berat badan baru (kg), null jika tidak diubah" },
-        pushup_target: { type: ["number", "null"], description: "Target push-up KAI baru, null jika tidak diubah" },
-        situp_target: { type: ["number", "null"], description: "Target sit-up KAI baru, null jika tidak diubah" },
+        weight_kg: { type: "number", description: "Target berat badan baru (kg). Field ini opsional — kalau tidak ingin diubah, jangan disertakan sama sekali dalam tool call." },
+        pushup_target: { type: "number", description: "Target push-up KAI baru. Field ini opsional — kalau tidak ingin diubah, jangan disertakan sama sekali dalam tool call." },
+        situp_target: { type: "number", description: "Target sit-up KAI baru. Field ini opsional — kalau tidak ingin diubah, jangan disertakan sama sekali dalam tool call." },
         reason: { type: "string", description: "Alasan singkat berbasis data user" }
       },
       required: ["reason"]
