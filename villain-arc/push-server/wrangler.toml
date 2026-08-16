@@ -13,7 +13,7 @@ id = "45c704cf7f0b45feb6701916d8e346bb"
 
 [vars]
 VAPID_SUBJECT = "mailto:fokuskarir06@gmail.com"
-VAPID_PUBLIC_KEY = "BBEEQSGQu_pPxfM7lZyx7sTmH4PkJCVcRH_EAmwubJxlF65nSBWWUB1p92__PWvYZSgGpo50s4G62zaIcDzpQTs"
+VAPID_PUBLIC_KEY = "BCq2swJnlQ2YlAYlj2vrK_hEDB_jO7GDRQZyZ_bfa1oClMAy9xsXTPAplzvSDerRZbpeofdQ5kVwDxdAql8-lXs"
 
 # VAPID_PRIVATE_KEY di-set lewat `wrangler secret put VAPID_PRIVATE_KEY`
 # (teks polos hasil `npx web-push generate-vapid-keys`, BUKAN JSON),
