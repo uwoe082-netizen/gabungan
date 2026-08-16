@@ -1,4 +1,4 @@
-const CACHE_NAME = "villain-arc-v5";
+const CACHE_NAME = "villain-arc-v6";
 const PRECACHE_URLS = [
   "./",
   "./index.html",
@@ -37,9 +37,34 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Cache-first strategy
+// Strategi berbeda per jenis file:
+// - JS/CSS/HTML (kode app): NETWORK-FIRST — selalu coba ambil versi terbaru
+//   dari server dulu; baru fallback ke cache kalau offline. Ini penting
+//   supaya update kode (rotasi VAPID key, bugfix, dll) langsung kepakai
+//   tanpa user harus manual "Clear site data" tiap ada perubahan.
+// - Aset statis (icon dll): CACHE-FIRST seperti biasa — jarang berubah,
+//   lebih hemat kuota & lebih cepat dimuat.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  const url = event.request.url;
+  const isAppCode = /\.(js|css|html)(\?|$)/.test(url) || url.endsWith("/");
+
+  if (isAppCode) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === "basic") {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
