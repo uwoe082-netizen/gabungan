@@ -181,6 +181,10 @@ async function sendWebPush(env, subscription, payloadObj) {
     },
     body
   });
+  // Debug: log status + body respons asli dari push service (FCM/Mozilla/dst),
+  // supaya kelihatan lewat `wrangler tail` kalau ada yang ditolak diam-diam.
+  const resBodyText = await res.clone().text().catch(() => "(gagal baca body)");
+  console.log(`[push] endpoint=${subscription.endpoint.slice(0, 60)}... status=${res.status} body=${resBodyText.slice(0, 300)}`);
   return res;
 }
 
@@ -220,7 +224,8 @@ async function handleTest(request, env) {
       title: "VILLAIN ARC ⚔️ (Tes)",
       body: "Kalau kamu lihat ini, push server kamu jalan dengan benar."
     });
-    return json({ ok: res.ok, status: res.status });
+    const bodyText = await res.text().catch(() => "");
+    return json({ ok: res.ok, status: res.status, pushServiceBody: bodyText.slice(0, 300) });
   } catch (e) {
     return json({ error: String(e.message || e) }, 500);
   }
