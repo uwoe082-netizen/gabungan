@@ -39,8 +39,10 @@ function json(data, status = 200) {
 
 // ---------- base64url helpers ----------
 function b64urlToBytes(str) {
-  const pad = str.length % 4 === 0 ? "" : "=".repeat(4 - (str.length % 4));
-  const b64 = str.replace(/-/g, "+").replace(/_/g, "/") + pad;
+  // Bersihkan whitespace/newline yang kadang ikut ke-paste dari terminal/clipboard.
+  const clean = String(str).trim().replace(/[\r\n\s]/g, "");
+  const pad = clean.length % 4 === 0 ? "" : "=".repeat(4 - (clean.length % 4));
+  const b64 = clean.replace(/-/g, "+").replace(/_/g, "/") + pad;
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -74,6 +76,18 @@ async function endpointKey(endpoint) {
 // dari raw public key (65 byte, uncompressed point 0x04||X||Y), d = raw private key apa adanya.
 function jwkFromRawKeys(publicKeyB64url, privateKeyB64url) {
   const pubBytes = b64urlToBytes(publicKeyB64url); // 65 bytes
+  const privBytes = b64urlToBytes(privateKeyB64url); // wajib 32 bytes (scalar P-256)
+
+  if (pubBytes.length !== 65) {
+    throw new Error(`VAPID_PUBLIC_KEY panjangnya salah (${pubBytes.length} byte, harusnya 65). Cek ada karakter kepotong/ekstra saat copy-paste.`);
+  }
+  if (pubBytes[0] !== 0x04) {
+    throw new Error("VAPID_PUBLIC_KEY tidak diawali byte 0x04 (uncompressed point) — kemungkinan formatnya bukan raw public key P-256 yang benar.");
+  }
+  if (privBytes.length !== 32) {
+    throw new Error(`VAPID_PRIVATE_KEY panjangnya salah (${privBytes.length} byte, harusnya 32). Cek ada karakter kepotong/ekstra/whitespace saat wrangler secret put.`);
+  }
+
   const x = pubBytes.slice(1, 33);
   const y = pubBytes.slice(33, 65);
   return {
@@ -81,7 +95,7 @@ function jwkFromRawKeys(publicKeyB64url, privateKeyB64url) {
     crv: "P-256",
     x: bytesToB64url(x),
     y: bytesToB64url(y),
-    d: privateKeyB64url,
+    d: bytesToB64url(privBytes),
     ext: true
   };
 }
