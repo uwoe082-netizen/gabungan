@@ -121,13 +121,20 @@ const Notifications = {
     if (perm !== "granted") throw new Error("Izin notifikasi ditolak.");
 
     const reg = await navigator.serviceWorker.ready;
+    // PENTING: selalu bikin subscription BARU, jangan pakai yang lama kalau ada.
+    // Kalau public key VAPID pernah berubah (mis. rotate key), subscription lama
+    // masih "valid" secara browser tapi endpoint-nya terikat ke key LAMA — push
+    // service (WNS/FCM/dst) akan tolak dengan 401 kalau kita sign pakai key baru
+    // tapi subscription-nya masih pakai key lama. Unsubscribe dulu, baru subscribe
+    // ulang dengan key yang aktif sekarang, supaya selalu sinkron.
     let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
+    if (sub) {
+      await sub.unsubscribe().catch(() => {});
     }
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
 
     const settings = AppData.getSettings();
     const tzOffsetMinutes = -new Date().getTimezoneOffset(); // menit di timur UTC (WIB = 420)
