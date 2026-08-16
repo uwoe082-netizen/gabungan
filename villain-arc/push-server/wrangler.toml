@@ -9,11 +9,11 @@ crons = ["* * * * *"]
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTIONS"
-id = "PASTE_KV_NAMESPACE_ID_DI_SINI"
+id = "45c704cf7f0b45feb6701916d8e346bb"
 
 [vars]
-VAPID_SUBJECT = "mailto:ganti-dengan-emailmu@example.com"
-VAPID_PUBLIC_KEY = "PASTE_VAPID_PUBLIC_KEY_DI_SINI"
+VAPID_SUBJECT = "mailto:uwoe082@gmail.com"
+VAPID_PUBLIC_KEY = "BBEEQSGQu_pPxfM7lZyx7sTmH4PkJCVcRH_EAmwubJxlF65nSBWWUB1p92__PWvYZSgGpo50s4G62zaIcDzpQTs"
 
 # VAPID_PRIVATE_JWK di-set lewat `wrangler secret put VAPID_PRIVATE_JWK`,
 # JANGAN taruh di sini / commit ke git.
