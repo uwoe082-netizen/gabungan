@@ -5,7 +5,7 @@
 // Public VAPID key punya push-server (lihat push-server/README.md).
 // Ini AMAN untuk ditaruh di client — VAPID public key memang didesain publik,
 // yang wajib rahasia cuma private key-nya (disimpan sbg Cloudflare secret).
-const VAPID_PUBLIC_KEY = "BBEEQSGQu_pPxfM7lZyx7sTmH4PkJCVcRH_EAmwubJxlF65nSBWWUB1p92__PWvYZSgGpo50s4G62zaIcDzpQTs";
+const VAPID_PUBLIC_KEY = "BCq2swJnlQ2YlAYlj2vrK_hEDB_jO7GDRQZyZ_bfa1oClMAy9xsXTPAplzvSDerRZbpeofdQ5kVwDxdAql8-lXs";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
