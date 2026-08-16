@@ -15,7 +15,8 @@
 //   POST /test         { endpoint }  -> kirim 1 notifikasi tes langsung
 //
 // Env yang wajib di-set (lihat README.md):
-//   VAPID_PRIVATE_JWK  (secret, JSON string JWK private key P-256)
+//   VAPID_PRIVATE_KEY  (secret, teks base64url polos — persis output "Private Key"
+//                        dari `npx web-push generate-vapid-keys`, BUKAN JSON)
 //   VAPID_PUBLIC_KEY   (plain var, base64url raw public key 65-byte)
 //   VAPID_SUBJECT      (plain var, mis. "mailto:kamu@email.com")
 //   Binding KV: SUBSCRIPTIONS
@@ -66,6 +67,25 @@ async function endpointKey(endpoint) {
   return "sub:" + bytesToB64url(new Uint8Array(digest)).slice(0, 32);
 }
 
+// ---------- Bangun JWK dari raw public+private key (format asli output `web-push generate-vapid-keys`) ----------
+// Catatan penting: `npx web-push generate-vapid-keys` TIDAK mengeluarkan JSON Web Key (JWK) object —
+// dia keluarin Public Key & Private Key sebagai teks base64url polos. Web Crypto API butuh JWK
+// lengkap (x, y, d) untuk import private key, jadi kita rekonstruksi JWK-nya di sini: x & y diambil
+// dari raw public key (65 byte, uncompressed point 0x04||X||Y), d = raw private key apa adanya.
+function jwkFromRawKeys(publicKeyB64url, privateKeyB64url) {
+  const pubBytes = b64urlToBytes(publicKeyB64url); // 65 bytes
+  const x = pubBytes.slice(1, 33);
+  const y = pubBytes.slice(33, 65);
+  return {
+    kty: "EC",
+    crv: "P-256",
+    x: bytesToB64url(x),
+    y: bytesToB64url(y),
+    d: privateKeyB64url,
+    ext: true
+  };
+}
+
 // ---------- VAPID JWT (RFC 8292) ----------
 async function buildVapidHeader(env, endpoint) {
   const aud = new URL(endpoint).origin;
@@ -77,7 +97,7 @@ async function buildVapidHeader(env, endpoint) {
   };
   const unsigned = bytesToB64url(utf8(JSON.stringify(header))) + "." + bytesToB64url(utf8(JSON.stringify(payload)));
 
-  const jwk = JSON.parse(env.VAPID_PRIVATE_JWK);
+  const jwk = jwkFromRawKeys(env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
   const privateKey = await crypto.subtle.importKey(
     "jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]
   );

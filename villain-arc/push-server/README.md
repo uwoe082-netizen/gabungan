@@ -52,9 +52,9 @@ Edit `wrangler.toml`:
 ## 4. Set private key sebagai secret (JANGAN taruh di wrangler.toml)
 
 ```bash
-wrangler secret put VAPID_PRIVATE_JWK
+wrangler secret put VAPID_PRIVATE_KEY
 ```
-Pas diminta paste value, tempel persis JSON `VAPID_PRIVATE_JWK` di atas (satu baris).
+Pas diminta paste value, tempel PERSIS baris "Private Key" dari output `npx web-push generate-vapid-keys` (teks polos, bukan JSON — jangan tambah kurung kurawal atau tanda kutip apa pun).
 
 ## 5. Deploy
 
