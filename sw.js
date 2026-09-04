@@ -1,7 +1,7 @@
 /* Root Service Worker — HANYA untuk dashboard (scope: repo root).
    Sub-app (hafiz/, villain-arc/, kai/) punya sw.js sendiri dengan
    scope terbatas ke folder masing-masing — jangan didaftarkan dari sini. */
-const CACHE_VERSION = 'ecosystem-dashboard-v1';
+const CACHE_VERSION = 'ecosystem-dashboard-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -28,7 +28,18 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   // Hanya tangani request untuk file dashboard sendiri, biarkan sub-app diurus SW masing-masing
   if (!ASSETS.some((a) => url.pathname.endsWith(a.replace('./', '')))) return;
+  if (event.request.method !== 'GET') return;
+
+  // Network-first: selalu coba ambil versi terbaru dulu, supaya perubahan
+  // konten langsung kepakai tanpa perlu bump CACHE_VERSION manual tiap edit.
+  // Fallback ke cache kalau offline.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
   );
 });

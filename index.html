@@ -3,189 +3,308 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ecosystem — Ruang Kendali</title>
+<title>Arsip — Tiga Gerbang Ritual Harian</title>
+<meta name="description" content="Satu halaman pembuka harian: peringkat XP gabungan dari Hafiz, Villain Arc, dan KAI Psikotes Simulator.">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0E1420">
+<meta name="theme-color" content="#0b0c10">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0E1420;
-    --panel:#161E2E;
-    --panel-line:#26314A;
-    --text:#E7ECF5;
-    --text-dim:#8B96AC;
-    --spiritual:#3FA37A;   /* Hafiz — hijau tasbih */
-    --physical:#D6553A;    /* Villain Arc — ember */
-    --cognitive:#4C8FD1;   /* KAI — sinyal stasiun */
-    --gold:#D8B45C;
-    --mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
-    --sans: 'IBM Plex Sans', system-ui, sans-serif;
-    --serif: 'Amiri', 'Georgia', serif;
+    --ink: oklch(0.139 0.005 262.8);
+    --surface: oklch(0.179 0.01 276.4);
+    --raised: oklch(0.216 0.018 275);
+    --edge: oklch(0.286 0.023 270.5);
+    --mist: oklch(0.604 0.022 270.1);
+    --snow: oklch(0.932 0.011 84.5);
+    --ember: oklch(0.733 0.119 69.1);
+    --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
   }
   *{box-sizing:border-box;}
   body{
-    margin:0; background:var(--bg); color:var(--text);
-    font-family:var(--sans); min-height:100vh;
-    background-image:
-      radial-gradient(circle at 15% 0%, rgba(63,163,122,.10), transparent 40%),
-      radial-gradient(circle at 85% 0%, rgba(214,85,58,.10), transparent 40%),
-      radial-gradient(circle at 50% 100%, rgba(76,143,209,.08), transparent 45%);
+    margin:0; min-height:100vh; background:var(--ink); color:var(--snow);
+    font-family:var(--font-sans); -webkit-font-smoothing:antialiased;
   }
-  header.deck{
-    padding:28px 20px 18px; text-align:center; border-bottom:1px solid var(--panel-line);
-  }
-  header.deck .eyebrow{
-    font-family:var(--mono); letter-spacing:.25em; font-size:.7rem; color:var(--text-dim);
-    text-transform:uppercase;
-  }
-  header.deck h1{
-    font-size:clamp(1.6rem,4vw,2.4rem); margin:.4rem 0 0; font-weight:600;
-    background:linear-gradient(90deg,var(--spiritual),var(--gold),var(--physical),var(--cognitive));
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-  }
-  main{max-width:1080px; margin:0 auto; padding:24px 20px 60px;}
+  ::selection{ background-color: color-mix(in oklab, var(--ember) 30%, transparent); }
+  a{ text-decoration:none; color:inherit; }
 
-  /* Global rank bar */
-  .rank-bar{
-    background:var(--panel); border:1px solid var(--panel-line); border-radius:14px;
-    padding:20px 22px; display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-bottom:26px;
-  }
-  .rank-bar .rank-name{font-size:1.3rem; font-weight:600; color:var(--gold);}
-  .rank-bar .rank-sub{font-family:var(--mono); font-size:.78rem; color:var(--text-dim); margin-top:2px;}
-  .rank-track{flex:1; min-width:180px; height:10px; border-radius:6px; background:#0B111C; overflow:hidden; border:1px solid var(--panel-line);}
-  .rank-fill{height:100%; background:linear-gradient(90deg,var(--spiritual),var(--gold),var(--physical),var(--cognitive));}
+  .wrap{ max-width:1180px; margin:0 auto; padding:28px 20px 40px; }
+  @media (min-width:640px){ .wrap{ padding:40px 32px 56px; } }
 
-  /* Three-domain grid */
-  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
-  @media (max-width:820px){ .grid{grid-template-columns:1fr;} }
-
-  .card{
-    background:var(--panel); border:1px solid var(--panel-line); border-radius:14px;
-    padding:20px; display:flex; flex-direction:column; gap:10px; text-decoration:none; color:var(--text);
-    position:relative; overflow:hidden; transition:transform .15s ease, border-color .15s ease;
+  /* ---- header ---- */
+  header{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:36px; height:36px; display:grid; place-items:center; border-radius:6px;
+    background:var(--raised); border:1px solid var(--edge);
+    font-family:var(--font-display); font-size:1.1rem; color:var(--ember);
   }
-  .card:hover{transform:translateY(-3px); border-color:var(--accent);}
-  .card::before{
-    content:''; position:absolute; inset:0 0 auto 0; height:3px; background:var(--accent);
-  }
-  .card[data-app="hafiz"]{--accent:var(--spiritual);}
-  .card[data-app="villain-arc"]{--accent:var(--physical);}
-  .card[data-app="kai"]{--accent:var(--cognitive);}
+  .brand-name{ font-family:var(--font-display); font-size:1.5rem; letter-spacing:-0.01em; line-height:1; margin:0; }
+  .brand-sub{ font-size:10px; letter-spacing:0.35em; text-transform:uppercase; color:var(--mist); margin:4px 0 0; }
 
-  .card .domain{font-family:var(--mono); font-size:.68rem; letter-spacing:.15em; text-transform:uppercase; color:var(--accent);}
-  .card h2{margin:0; font-size:1.25rem;}
-  .card p.desc{margin:0; color:var(--text-dim); font-size:.88rem; line-height:1.4;}
-  .card .today{
-    margin-top:auto; padding-top:10px; border-top:1px dashed var(--panel-line);
-    font-family:var(--mono); font-size:.8rem; display:flex; justify-content:space-between; align-items:center;
-  }
-  .card .today .status-dot{width:8px;height:8px;border-radius:50%; display:inline-block; margin-right:6px;}
-  .dot-yes{background:var(--accent);}
-  .dot-no{background:#3A445C;}
+  nav.pills{ display:flex; align-items:center; gap:4px; border-radius:999px; background:color-mix(in oklab, var(--surface) 70%, transparent); border:1px solid var(--edge); padding:4px; }
+  nav.pills a{ border-radius:999px; padding:6px 12px; font-size:12px; color:var(--mist); transition:color .15s ease, background .15s ease; }
+  nav.pills a:hover{ color:var(--snow); }
+  nav.pills a.current{ background:var(--raised); color:var(--snow); border:1px solid var(--edge); }
 
-  footer{text-align:center; padding:20px; color:var(--text-dim); font-family:var(--mono); font-size:.72rem;}
-  footer a{color:var(--text-dim);}
+  /* ---- rank hero ---- */
+  .hero{
+    position:relative; overflow:hidden; margin-top:32px; padding:28px;
+    border-radius:24px; border:1px solid var(--edge);
+    background:linear-gradient(to bottom, var(--raised), var(--surface));
+  }
+  @media (min-width:640px){ .hero{ margin-top:40px; padding:40px; } }
+  .hero-glow{
+    position:absolute; top:-96px; left:50%; transform:translateX(-50%);
+    width:256px; height:256px; border-radius:999px; background:color-mix(in oklab, var(--ember) 20%, transparent);
+    filter:blur(64px); pointer-events:none; animation:ember-breathe 4.5s ease-in-out infinite;
+  }
+  .hero-topline{ position:absolute; inset:0 0 auto 0; height:1px; background:linear-gradient(to right, transparent, var(--edge), transparent); }
+  .hero-inner{ position:relative; }
+  .hero-row{ display:flex; flex-direction:column; gap:24px; }
+  @media (min-width:640px){ .hero-row{ flex-direction:row; align-items:flex-end; justify-content:space-between; } }
+  .eyebrow{ font-size:11px; letter-spacing:0.35em; text-transform:uppercase; color:var(--mist); margin:0; }
+  .rank-name{ font-family:var(--font-display); font-weight:600; font-size:clamp(2.4rem,7vw,3.75rem); line-height:1; letter-spacing:-0.02em; margin:2px 0 0; }
+  .rank-desc{ margin:10px 0 0; max-width:32ch; font-size:14px; color:var(--mist); }
+  .xp-total{ font-family:var(--font-display); font-weight:600; font-size:clamp(2.4rem,6vw,3.75rem); line-height:1; letter-spacing:-0.02em; color:var(--ember); margin:0; }
+  .xp-label{ margin:8px 0 0; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:var(--mist); }
+  .hero-right{ text-align:left; }
+  @media (min-width:640px){ .hero-right{ text-align:right; } }
+
+  .prog{ margin-top:32px; }
+  .prog-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px; color:var(--mist); }
+  .prog-row span:first-child{ letter-spacing:0.25em; text-transform:uppercase; }
+  .prog-track{ height:10px; width:100%; overflow:hidden; border-radius:999px; background:color-mix(in oklab, var(--ink) 60%, transparent); border:1px solid var(--edge); }
+  .prog-fill{
+    height:100%; border-radius:999px; background:linear-gradient(to right, color-mix(in oklab, var(--ember) 70%, transparent), var(--ember));
+    transform-origin:left; animation:ember-fill 1.6s cubic-bezier(.2,.7,.2,1) both;
+  }
+
+  /* ---- gates ---- */
+  .gates-label{ margin:36px 0 16px; font-size:11px; letter-spacing:0.35em; text-transform:uppercase; color:var(--mist); }
+  .gates{ display:grid; grid-template-columns:1fr; gap:16px; }
+  @media (min-width:820px){ .gates{ grid-template-columns:repeat(3,1fr); } }
+
+  .gate-card{
+    position:relative; display:block; overflow:hidden; border-radius:20px;
+    background:var(--surface); border:1px solid var(--edge); padding:24px;
+    transition:transform .25s cubic-bezier(.2,.7,.2,1), border-color .25s ease;
+  }
+  .gate-card:hover{ transform:translateY(-4px); border-color:color-mix(in oklab, var(--ember) 40%, var(--edge)); }
+  .gate-card:active{ transform:translateY(-1px); }
+  .gate-glow{
+    position:absolute; top:-64px; right:0; width:160px; height:160px; border-radius:999px;
+    background:color-mix(in oklab, var(--ember) 10%, transparent); filter:blur(32px);
+    pointer-events:none; transition:background .25s ease;
+  }
+  .gate-card:hover .gate-glow{ background:color-mix(in oklab, var(--ember) 20%, transparent); }
+  .gate-inner{ position:relative; }
+  .gate-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .gate-label{ font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:var(--mist); }
+  .gate-status{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--mist); white-space:nowrap; }
+  .status-dot{ width:8px; height:8px; border-radius:999px; display:inline-block; }
+  .status-dot.on{ background:var(--ember); box-shadow:0 0 8px 2px color-mix(in oklab, var(--ember) 60%, transparent); }
+  .status-dot.off{ background:color-mix(in oklab, var(--mist) 40%, transparent); }
+  .gate-name{ font-family:var(--font-display); font-weight:600; font-size:1.9rem; line-height:1.15; letter-spacing:-0.01em; margin:6px 0 0; }
+  .gate-line{ margin:2px 0 0; font-size:13px; color:var(--mist); }
+  .gate-blurb{ margin:16px 0 0; font-size:13px; line-height:1.6; color:color-mix(in oklab, var(--snow) 80%, transparent); }
+  .gate-foot{ margin-top:22px; padding-top:14px; border-top:1px solid var(--edge); display:flex; align-items:center; justify-content:space-between; font-size:12px; }
+  .gate-domain{ color:var(--mist); }
+  .gate-cta{ color:var(--mist); transition:transform .15s ease, color .15s ease; }
+  .gate-card:hover .gate-cta{ transform:translateX(4px); }
+  .gate-card.is-active .gate-cta{ color:var(--ember); }
+
+  footer{ margin-top:36px; text-align:center; font-size:11px; letter-spacing:0.2em; color:color-mix(in oklab, var(--mist) 70%, transparent); }
+
+  /* ---- reveal-on-load ---- */
+  .rise{ animation:ember-rise .9s cubic-bezier(.2,.7,.2,1) backwards; }
+  @keyframes ember-rise{ from{ opacity:0; transform:translateY(16px); } to{ opacity:1; transform:translateY(0); } }
+  @keyframes ember-fill{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
+  @keyframes ember-breathe{ 0%,100%{ opacity:.4; } 50%{ opacity:.85; } }
+  @media (prefers-reduced-motion: reduce){
+    .rise, .prog-fill, .hero-glow{ animation:none !important; opacity:1; }
+  }
 </style>
 </head>
 <body>
 
-<header class="deck">
-  <div class="eyebrow">Personal Ecosystem — Ruang Kendali</div>
-  <h1>Spiritual × Fisik × Kognitif</h1>
-</header>
+<div class="wrap">
 
-<main>
-  <section class="rank-bar" id="rankBar">
-    <div>
-      <div class="rank-name" id="rankName">Memuat...</div>
-      <div class="rank-sub" id="rankSub">—</div>
+  <header class="rise" style="animation-delay:.05s">
+    <div class="brand">
+      <div class="brand-mark">A</div>
+      <div>
+        <p class="brand-name">Arsip</p>
+        <p class="brand-sub">Ritual Harian</p>
+      </div>
     </div>
-    <div class="rank-track"><div class="rank-fill" id="rankFill" style="width:0%"></div></div>
-    <div class="rank-sub" id="rankXP">0 XP</div>
+    <nav class="pills">
+      <a href="./hafiz/">Hafiz</a>
+      <a href="./villain-arc/">Villain Arc</a>
+      <a href="./kai/">KAI</a>
+    </nav>
+  </header>
+
+  <section class="hero rise" style="animation-delay:.15s">
+    <div class="hero-glow"></div>
+    <div class="hero-topline"></div>
+    <div class="hero-inner">
+      <div class="hero-row">
+        <div>
+          <p class="eyebrow" id="rankPos">Peringkat · — dari 8</p>
+          <h1 class="rank-name" id="rankName">Memuat…</h1>
+          <p class="rank-desc">Setiap pagi, gerbangnya terbuka lagi. Tempa, jaga, dan ulangi.</p>
+        </div>
+        <div class="hero-right">
+          <p class="xp-total" id="rankXP">0</p>
+          <p class="xp-label">Total XP</p>
+        </div>
+      </div>
+      <div class="prog">
+        <div class="prog-row">
+          <span id="rankNextLabel">Menuju —</span>
+          <span id="rankNextXP">0 / 0 XP</span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" id="rankFill" style="width:0%"></div></div>
+      </div>
+    </div>
   </section>
 
-  <section class="grid">
-    <a class="card" data-app="hafiz" href="./hafiz/">
-      <div class="domain">Spiritual</div>
-      <h2>Hafiz</h2>
-      <p class="desc">Setoran &amp; murojaah hafalan Al-Qur'an dengan mushaf digital dan pengecekan bacaan.</p>
-      <div class="today" id="hafizToday"><span><span class="status-dot dot-no"></span>Memuat status hari ini…</span></div>
-    </a>
-    <a class="card" data-app="villain-arc" href="./villain-arc/">
-      <div class="domain">Fisik</div>
-      <h2>Villain Arc</h2>
-      <p class="desc">Program latihan 6 hari split dengan progresi rank dan pelacakan streak.</p>
-      <div class="today" id="villainToday"><span><span class="status-dot dot-no"></span>Memuat status hari ini…</span></div>
-    </a>
-    <a class="card" data-app="kai" href="./kai/">
-      <div class="domain">Kognitif</div>
-      <h2>KAI Psikotes</h2>
-      <p class="desc">Simulator psikotes prosedural: Kraepelin, TPA, spasial, daya ingat, kepribadian.</p>
-      <div class="today" id="kaiToday"><span><span class="status-dot dot-no"></span>Memuat status hari ini…</span></div>
-    </a>
-  </section>
-</main>
+  <p class="gates-label rise" style="animation-delay:.3s">Tiga gerbang · satu halaman</p>
 
-<footer>
-  personal-ecosystem &middot; dashboard membaca data lokal perangkat ini saja, tidak ada server
-</footer>
+  <div class="gates">
+    <a class="gate-card rise" data-app="hafiz" href="./hafiz/" style="animation-delay:.4s">
+      <div class="gate-glow"></div>
+      <div class="gate-inner">
+        <div class="gate-top">
+          <span class="gate-label">Gerbang Cahaya</span>
+          <span class="gate-status" id="hafizStatus"><span class="status-dot off"></span>Memuat…</span>
+        </div>
+        <h2 class="gate-name">Hafiz</h2>
+        <p class="gate-line">Hafalan Al-Qur'an</p>
+        <p class="gate-blurb">Satu halaman baru, dibaca dengan tenang di bawah cahaya lampu.</p>
+        <div class="gate-foot">
+          <span class="gate-domain">Spiritual</span>
+          <span class="gate-cta">Buka →</span>
+        </div>
+      </div>
+    </a>
+
+    <a class="gate-card rise" data-app="villain-arc" href="./villain-arc/" style="animation-delay:.5s">
+      <div class="gate-glow"></div>
+      <div class="gate-inner">
+        <div class="gate-top">
+          <span class="gate-label">Gerbang Pemahat</span>
+          <span class="gate-status" id="villainStatus"><span class="status-dot off"></span>Memuat…</span>
+        </div>
+        <h2 class="gate-name">Villain Arc</h2>
+        <p class="gate-line">Pelatihan fisik bergaya RPG</p>
+        <p class="gate-blurb">Setiap angkatan menaikkan level; tubuh ditempa seperti besi.</p>
+        <div class="gate-foot">
+          <span class="gate-domain">Fisik</span>
+          <span class="gate-cta">Buka →</span>
+        </div>
+      </div>
+    </a>
+
+    <a class="gate-card rise" data-app="kai" href="./kai/" style="animation-delay:.6s">
+      <div class="gate-glow"></div>
+      <div class="gate-inner">
+        <div class="gate-top">
+          <span class="gate-label">Panel Kognitif</span>
+          <span class="gate-status" id="kaiStatus"><span class="status-dot off"></span>Memuat…</span>
+        </div>
+        <h2 class="gate-name">KAI Psikotes</h2>
+        <p class="gate-line">Simulator tes kerja</p>
+        <p class="gate-blurb">Latih kecepatan dan akurasi, satu soal pada satu waktu.</p>
+        <div class="gate-foot">
+          <span class="gate-domain">Kognitif</span>
+          <span class="gate-cta">Buka →</span>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <p class="rise" style="animation-delay:.7s"><footer>Arsip · ritual pribadi, dibuka setiap pagi</footer></p>
+
+</div>
 
 <script src="shared/storage-bridge.js"></script>
 <script src="shared/gamification-core.js"></script>
 <script>
 (function () {
   function todayISO() { return new Date().toISOString().slice(0, 10); }
+  function setStatus(el, active, label) {
+    el.innerHTML = `<span class="status-dot ${active ? 'on' : 'off'}"></span>${label}`;
+  }
+  function setActive(cardEl, active) {
+    cardEl.classList.toggle('is-active', !!active);
+  }
 
-  // ---- Global rank bar ----
+  // ---- Rank hero (XP global lintas-app) ----
   function renderRank() {
     const profile = SharedGamification.getGlobalProfile();
+    const ranks = SharedGamification.GLOBAL_RANKS;
+    const idx = ranks.findIndex(r => r.name === profile.rank.name);
+
+    document.getElementById('rankPos').textContent = `Peringkat · ${idx + 1} dari ${ranks.length}`;
     document.getElementById('rankName').textContent = profile.rank.name;
+    document.getElementById('rankXP').textContent = profile.xp.toLocaleString('id-ID');
     document.getElementById('rankFill').style.width = profile.rank.progressToNext + '%';
-    document.getElementById('rankXP').textContent = profile.xp + ' XP total';
-    document.getElementById('rankSub').textContent = profile.rank.next
-      ? `${profile.rank.next.xp - profile.xp} XP menuju ${profile.rank.next.name}`
-      : 'Rank maksimum tercapai';
+
+    if (profile.rank.next) {
+      document.getElementById('rankNextLabel').textContent = `Menuju ${profile.rank.next.name}`;
+      const floor = ranks[idx].xp;
+      const ceil = profile.rank.next.xp;
+      document.getElementById('rankNextXP').textContent = `${profile.xp - floor} / ${ceil - floor} XP`;
+    } else {
+      document.getElementById('rankNextLabel').textContent = 'Rank maksimum tercapai';
+      document.getElementById('rankNextXP').textContent = `${profile.xp} XP`;
+    }
   }
 
   // ---- Hafiz: baca localStorage milik hafiz app langsung (same-origin) ----
   function renderHafizToday() {
-    const el = document.getElementById('hafizToday');
+    const el = document.getElementById('hafizStatus');
+    const card = document.querySelector('.gate-card[data-app="hafiz"]');
     try {
       const profile = JSON.parse(localStorage.getItem('hafiz:profile'));
       const activeToday = profile && profile.lastActiveDate === todayISO();
-      el.innerHTML = `<span><span class="status-dot ${activeToday ? 'dot-yes' : 'dot-no'}"></span>${activeToday ? 'Sudah setoran hari ini' : 'Belum setoran hari ini'}</span>` +
-        (profile ? `<span>${profile.xp || 0} XP</span>` : '');
+      setStatus(el, activeToday, activeToday ? 'Aktif hari ini' : 'Belum dimulai');
+      setActive(card, activeToday);
     } catch (e) {
-      el.innerHTML = `<span><span class="status-dot dot-no"></span>Belum ada data</span>`;
+      setStatus(el, false, 'Belum dimulai');
     }
   }
 
   // ---- Villain Arc: baca localStorage milik villain-arc app langsung ----
   function renderVillainToday() {
-    const el = document.getElementById('villainToday');
+    const el = document.getElementById('villainStatus');
+    const card = document.querySelector('.gate-card[data-app="villain-arc"]');
     try {
-      const xp = JSON.parse(localStorage.getItem('va_current_xp'));
       const streak = JSON.parse(localStorage.getItem('va_current_streak'));
-      const hasData = xp !== null && xp !== undefined;
-      el.innerHTML = `<span><span class="status-dot ${streak > 0 ? 'dot-yes' : 'dot-no'}"></span>Streak ${streak || 0} hari</span>` +
-        (hasData ? `<span>${xp} XP</span>` : '');
-      if (!hasData) el.innerHTML = `<span><span class="status-dot dot-no"></span>Belum ada data</span>`;
+      const active = (streak || 0) > 0;
+      setStatus(el, active, active ? `Streak ${streak} hari` : 'Belum dimulai');
+      setActive(card, active);
     } catch (e) {
-      el.innerHTML = `<span><span class="status-dot dot-no"></span>Belum ada data</span>`;
+      setStatus(el, false, 'Belum dimulai');
     }
   }
 
-  // ---- KAI: baca localStorage kai:lastScores + kai:history ----
+  // ---- KAI: baca localStorage kai:history ----
   function renderKaiToday() {
-    const el = document.getElementById('kaiToday');
+    const el = document.getElementById('kaiStatus');
+    const card = document.querySelector('.gate-card[data-app="kai"]');
     try {
       const history = JSON.parse(localStorage.getItem('kai:history')) || [];
       const today = todayISO();
       const doneToday = history.some(h => (h.date || '').slice(0, 10) === today);
-      const attempted = Object.keys(JSON.parse(localStorage.getItem('kai:lastScores')) || {}).length;
-      el.innerHTML = `<span><span class="status-dot ${doneToday ? 'dot-yes' : 'dot-no'}"></span>${doneToday ? 'Sudah latihan hari ini' : 'Belum latihan hari ini'}</span>` +
-        `<span>${attempted}/5 modul dicoba</span>`;
+      setStatus(el, doneToday, doneToday ? 'Aktif hari ini' : 'Belum dimulai');
+      setActive(card, doneToday);
     } catch (e) {
-      el.innerHTML = `<span><span class="status-dot dot-no"></span>Belum ada data</span>`;
+      setStatus(el, false, 'Belum dimulai');
     }
   }
 
